@@ -103,6 +103,44 @@ class ApplicationControllerTest {
                 .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"));
     }
 
+    @Test
+    @DisplayName("rejects a job URL with no scheme, which the browser would treat as relative")
+    void createRejectsSchemelessUrl() throws Exception {
+        mockMvc.perform(post("/api/v1/applications")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"companyName": "ATLEES", "roleTitle": "Intro SWE", "jobUrl": "ATLEES.COM"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors.jobUrl").exists());
+    }
+
+    @Test
+    @DisplayName("accepts an absolute job URL")
+    void createAcceptsAbsoluteUrl() throws Exception {
+        given(service.create(any())).willReturn(sampleResponse());
+
+        mockMvc.perform(post("/api/v1/applications")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"companyName": "ATLEES", "roleTitle": "Intro SWE", "jobUrl": "https://db.recsolu.com/external/requisitions/abc"}
+                                """))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    @DisplayName("a blank job URL is allowed - the service turns it into null")
+    void createAllowsBlankUrl() throws Exception {
+        given(service.create(any())).willReturn(sampleResponse());
+
+        mockMvc.perform(post("/api/v1/applications")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"companyName": "ATLEES", "roleTitle": "Intro SWE", "jobUrl": ""}
+                                """))
+                .andExpect(status().isCreated());
+    }
+
     private static ApplicationResponse sampleResponse() {
         return new ApplicationResponse(
                 1L,

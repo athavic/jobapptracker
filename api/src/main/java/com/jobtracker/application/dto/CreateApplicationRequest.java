@@ -2,9 +2,11 @@ package com.jobtracker.application.dto;
 
 import com.jobtracker.application.ApplicationStatus;
 import com.jobtracker.application.RemoteType;
+import com.jobtracker.common.ValidationPatterns;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 
@@ -29,6 +31,8 @@ public record CreateApplicationRequest(
         ApplicationStatus status,
 
         @Size(max = 64) String source,
+        @Pattern(regexp = ValidationPatterns.HTTP_URL,
+                message = "must be an absolute URL starting with http:// or https://")
         @Size(max = 1000) String jobUrl,
         @Size(max = 200) String location,
 

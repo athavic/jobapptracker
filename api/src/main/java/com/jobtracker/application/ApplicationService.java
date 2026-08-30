@@ -40,15 +40,15 @@ public class ApplicationService {
                 request.status() != null ? request.status() : ApplicationStatus.SAVED;
 
         JobApplication application = new JobApplication(company, request.roleTitle().trim(), status);
-        application.setSource(request.source());
-        application.setJobUrl(request.jobUrl());
-        application.setLocation(request.location());
+        application.setSource(blankToNull(request.source()));
+        application.setJobUrl(blankToNull(request.jobUrl()));
+        application.setLocation(blankToNull(request.location()));
         application.setRemoteType(request.remoteType());
         application.setSalaryMin(request.salaryMin());
         application.setSalaryMax(request.salaryMax());
         application.setCurrency(normalizeCurrency(request.currency()));
-        application.setResumeVersion(request.resumeVersion());
-        application.setNotes(request.notes());
+        application.setResumeVersion(blankToNull(request.resumeVersion()));
+        application.setNotes(blankToNull(request.notes()));
 
         if (request.priority() != null) {
             application.setPriority(request.priority());
@@ -98,13 +98,13 @@ public class ApplicationService {
             application.setRoleTitle(request.roleTitle().trim());
         }
         if (request.source() != null) {
-            application.setSource(request.source());
+            application.setSource(blankToNull(request.source()));
         }
         if (request.jobUrl() != null) {
-            application.setJobUrl(request.jobUrl());
+            application.setJobUrl(blankToNull(request.jobUrl()));
         }
         if (request.location() != null) {
-            application.setLocation(request.location());
+            application.setLocation(blankToNull(request.location()));
         }
         if (request.remoteType() != null) {
             application.setRemoteType(request.remoteType());
@@ -122,10 +122,10 @@ public class ApplicationService {
             application.setPriority(request.priority());
         }
         if (request.resumeVersion() != null) {
-            application.setResumeVersion(request.resumeVersion());
+            application.setResumeVersion(blankToNull(request.resumeVersion()));
         }
         if (request.notes() != null) {
-            application.setNotes(request.notes());
+            application.setNotes(blankToNull(request.notes()));
         }
         if (request.appliedAt() != null) {
             application.setAppliedAt(request.appliedAt());
@@ -194,6 +194,19 @@ public class ApplicationService {
 
     private static String normalizeCurrency(String currency) {
         return currency == null ? null : currency.trim().toUpperCase();
+    }
+
+    /**
+     * Empty string and null both mean "no value", and storing both means every
+     * reader has to check for both. Collapse them here, at the one place data
+     * enters the system.
+     */
+    private static String blankToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     /**
