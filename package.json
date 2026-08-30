@@ -1,0 +1,22 @@
+{
+  "name": "jobapptracker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Job application tracker - dev task runner for the whole stack",
+  "scripts": {
+    "dev": "npm run db:up && concurrently -n api,web -c cyan,magenta -k --handle-input \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "mvn -q -f api/pom.xml spring-boot:run",
+    "dev:web": "npm --prefix web run dev",
+    "dev:stop": "node scripts/stop-dev.mjs",
+    "db:up": "docker compose up -d --wait",
+    "db:down": "docker compose down",
+    "db:reset": "docker compose down -v && docker compose up -d --wait",
+    "db:psql": "docker exec -it jobtracker-postgres psql -U jobtracker -d jobtracker",
+    "test": "mvn -f api/pom.xml test",
+    "build": "mvn -f api/pom.xml package && npm --prefix web run build",
+    "generate:api": "npm --prefix web run generate:api"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
+  }
+}

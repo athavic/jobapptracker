@@ -24,7 +24,23 @@ You need Docker Desktop **running**, Maven (which uses `JAVA_HOME`, currently JD
 
 ## Run it
 
-Three terminals.
+One command, from the repo root:
+
+```bash
+npm run dev
+```
+
+That starts Postgres and waits for its healthcheck to pass, then runs the API and the
+Vite dev server together with their logs interleaved and prefixed `[api]` / `[web]`.
+Ctrl-C stops both.
+
+The wait matters: Spring Boot does not retry its database connection, so starting it
+before Postgres is ready fails outright at Flyway.
+
+Run `npm install` once at the root first, to get the task runner.
+
+<details>
+<summary>Or run the three processes yourself, in this order</summary>
 
 ```bash
 docker compose up -d
@@ -38,6 +54,27 @@ cd api && mvn spring-boot:run
 cd web && npm run dev
 ```
 
+</details>
+
+### Every script
+
+| | |
+|---|---|
+| `npm run dev` | database, API and web together |
+| `npm run dev:stop` | free ports 8080 and 5173 after a crash or a closed terminal |
+| `npm run dev:api` / `dev:web` | one server on its own |
+| `npm test` | the API test suite |
+| `npm run build` | package the API and build the web bundle |
+| `npm run generate:api` | regenerate TypeScript types from the running API |
+| `npm run db:up` / `db:down` | start or stop Postgres |
+| `npm run db:reset` | **destroys the data** and recreates an empty schema |
+| `npm run db:psql` | a psql shell inside the container |
+
+`dev:stop` exists because Ctrl-C is not the only way a dev server dies. Close the terminal
+window or stop it from the IDE and, on Windows, the child java and node processes outlive
+their parent and keep holding the ports - so the next `npm run dev` fails with
+`Port 5173 is already in use`. `dev:stop` clears them. It never touches Postgres.
+
 | | |
 |---|---|
 | App | <http://localhost:5173> |
@@ -45,20 +82,17 @@ cd web && npm run dev
 | Swagger UI | <http://localhost:8080/swagger-ui.html> |
 | OpenAPI spec | <http://localhost:8080/v3/api-docs> |
 
-Stop the database with `docker compose down`. Add `-v` to also drop the data volume and
-start from an empty schema.
-
 ## Test it
 
 ```bash
-cd api && mvn test
+npm test
 ```
 
 Eleven tests, no database needed: the lifecycle rules run as plain unit tests, and the
 controller runs as a `@WebMvcTest` slice with the service mocked.
 
 ```bash
-cd web && npm run build
+npm run build
 ```
 
 Runs `tsc -b` before bundling, so type errors fail the build.
@@ -66,7 +100,7 @@ Runs `tsc -b` before bundling, so type errors fail the build.
 ## Poke at the database directly
 
 ```bash
-docker exec -it jobtracker-postgres psql -U jobtracker -d jobtracker
+npm run db:psql
 ```
 
 `\dt` lists tables, `\d job_application` describes one, `\q` quits.
@@ -90,7 +124,8 @@ Java DTO records  ──springdoc──>  /v3/api-docs  ──openapi-typescript
 cd web && npm run generate:api
 ```
 
-with the API running. Then `npm run build` — TypeScript will name every component that
+with the API running (`npm run generate:api` from the root does the same). Then
+`npm run build` — TypeScript will name every component that
 depended on the old shape. That is the whole point: the compiler, not a runtime 500, tells
 you what a backend change broke.
 
