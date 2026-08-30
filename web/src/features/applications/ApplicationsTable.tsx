@@ -41,6 +41,58 @@ function StatusControl({ application }: { application: Application }) {
   )
 }
 
+/**
+ * The role title doubles as the link to the posting, so the table does not need
+ * a column for a URL that would never fit in one.
+ *
+ * jobUrl is optional, so the non-link branch renders a <span> rather than a
+ * <div> - swapping between a block and an inline element would shift rows that
+ * have a link against rows that do not.
+ */
+function RoleCell({ application }: { application: Application }) {
+  return (
+    <>
+      {application.jobUrl ? (
+        <a
+          href={application.jobUrl}
+          target="_blank"
+          // Without noopener the posting gets a live handle back to this tab
+          // through window.opener and can navigate it somewhere else.
+          rel="noopener noreferrer"
+          className="font-medium text-ink underline-offset-2 hover:text-brand hover:underline"
+        >
+          {application.roleTitle}
+          {/* An SVG rather than the ↗ character: Windows renders U+2197 as a
+              colour emoji by default, which ignores the surrounding text
+              colour. Decorative, so hidden from screen readers... */}
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="ml-1 inline-block size-3 align-[-0.1em] opacity-60"
+          >
+            <path d="M7 17 17 7" />
+            <path d="M9 7h8v8" />
+          </svg>
+          {/* ...so the same warning is given here instead. Opening a new tab
+              unannounced is disorienting, and both audiences deserve the hint. */}
+          <span className="sr-only"> (opens the job posting in a new tab)</span>
+        </a>
+      ) : (
+        <span className="font-medium text-ink">{application.roleTitle}</span>
+      )}
+
+      {application.location && (
+        <div className="text-xs text-ink-soft">{application.location}</div>
+      )}
+    </>
+  )
+}
+
 export function ApplicationsTable({ applications }: { applications: Application[] }) {
   if (applications.length === 0) {
     return (
@@ -75,10 +127,7 @@ export function ApplicationsTable({ applications }: { applications: Application[
               className="border-b border-line last:border-0 hover:bg-canvas"
             >
               <td className="px-4 py-3">
-                <div className="font-medium text-ink">{application.roleTitle}</div>
-                {application.location && (
-                  <div className="text-xs text-ink-soft">{application.location}</div>
-                )}
+                <RoleCell application={application} />
               </td>
 
               <td className="px-4 py-3 text-ink-soft">{application.company.name}</td>
