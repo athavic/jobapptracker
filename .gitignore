@@ -1,0 +1,24 @@
+# secrets
+.env
+
+# java / maven
+target/
+*.class
+
+# node
+node_modules/
+dist/
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# editors / os
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db

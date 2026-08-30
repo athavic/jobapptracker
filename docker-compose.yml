@@ -1,0 +1,23 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: jobtracker-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-jobtracker}
+      POSTGRES_USER: ${DB_USER:-jobtracker}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-jobtracker}
+    ports:
+      # 5433 on the host, not 5432: this machine already runs a native
+      # PostgreSQL 18 service on 5432. Inside the container it is still 5432.
+      - "${DB_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-jobtracker} -d ${DB_NAME:-jobtracker}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  pgdata:

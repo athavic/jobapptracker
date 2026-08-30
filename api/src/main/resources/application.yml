@@ -1,0 +1,38 @@
+spring:
+  application:
+    name: jobtracker-api
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:jobtracker}
+    username: ${DB_USER:jobtracker}
+    password: ${DB_PASSWORD:jobtracker}
+
+  jpa:
+    hibernate:
+      # validate, never update. Flyway owns the schema; Hibernate only checks
+      # that the entities match what the migrations produced.
+      ddl-auto: validate
+    # false = no lazy loading outside a transaction. Forces you to fetch what
+    # you need in the service layer, which is how you avoid surprise N+1s.
+    open-in-view: false
+    show-sql: true
+    properties:
+      hibernate.format_sql: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: ${SERVER_PORT:8080}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+
+logging:
+  level:
+    # uncomment to see the values bound into each query
+    # org.hibernate.orm.jdbc.bind: TRACE
+    org.flywaydb: INFO

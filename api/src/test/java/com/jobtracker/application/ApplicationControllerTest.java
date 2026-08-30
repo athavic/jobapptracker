@@ -1,0 +1,109 @@
+package com.jobtracker.application;
+
+import com.jobtracker.application.dto.ApplicationResponse;
+import com.jobtracker.application.dto.CompanySummary;
+import com.jobtracker.common.InvalidStatusTransitionException;
+import com.jobtracker.common.NotFoundException;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.time.Instant;
+import java.util.Set;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+/**
+ * A web-layer slice test: real HTTP mapping, real validation, real exception
+ * handling - with the service mocked out. No database, so it runs anywhere.
+ */
+@WebMvcTest(ApplicationController.class)
+class ApplicationControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockitoBean
+    private ApplicationService service;
+
+    @Test
+    @DisplayName("POST returns 201 and a Location header")
+    void createReturnsCreated() throws Exception {
+        given(service.create(any())).willReturn(sampleResponse());
+
+        mockMvc.perform(post("/api/v1/applications")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"companyName": "Stripe", "roleTitle": "Backend Engineer"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Location", "http://localhost/api/v1/applications/1"))
+                .andExpect(jsonPath("$.company.name").value("Stripe"))
+                .andExpect(jsonPath("$.status").value("APPLIED"));
+    }
+
+    @Test
+    @DisplayName("POST with a blank role title returns 400 and names the bad field")
+    void createRejectsInvalidBody() throws Exception {
+        mockMvc.perform(post("/api/v1/applications")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"companyName": "Stripe", "roleTitle": "  "}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("Validation failed"))
+                .andExpect(jsonPath("$.fieldErrors.roleTitle").exists());
+    }
+
+    @Test
+    @DisplayName("an illegal status transition returns 409, not 500")
+    void illegalTransitionReturnsConflict() throws Exception {
+        willThrow(new InvalidStatusTransitionException("Cannot move from SAVED to ACCEPTED"))
+                .given(service).changeStatus(eq(1L), any());
+
+        mockMvc.perform(post("/api/v1/applications/1/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"status": "ACCEPTED"}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Illegal status transition"));
+    }
+
+    @Test
+    @DisplayName("an unknown id returns 404 as a problem detail")
+    void unknownIdReturnsNotFound() throws Exception {
+        given(service.get(999L)).willThrow(new NotFoundException("Application", 999L));
+
+        mockMvc.perform(get("/api/v1/applications/999"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("Application 999 not found"));
+    }
+
+    private static ApplicationResponse sampleResponse() {
+        return new ApplicationResponse(
+                1L,
+                new CompanySummary(7L, "Stripe", null),
+                "Backend Engineer",
+                ApplicationStatus.APPLIED,
+                Set.of(ApplicationStatus.SCREEN, ApplicationStatus.REJECTED),
+                "careers page", null, "Remote", RemoteType.REMOTE,
+                null, null, null, 3, null, null,
+                Instant.parse("2026-08-30T10:00:00Z"),
+                false,
+                Instant.parse("2026-08-30T10:00:00Z"),
+                Instant.parse("2026-08-30T10:00:00Z"));
+    }
+}
