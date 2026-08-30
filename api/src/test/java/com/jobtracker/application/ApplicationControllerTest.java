@@ -20,6 +20,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -90,6 +91,16 @@ class ApplicationControllerTest {
         mockMvc.perform(get("/api/v1/applications/999"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.detail").value("Application 999 not found"));
+    }
+
+    @Test
+    @DisplayName("answers the browser preflight so the Vite dev server can call the API")
+    void corsPreflightIsAllowed() throws Exception {
+        mockMvc.perform(options("/api/v1/applications")
+                        .header("Origin", "http://localhost:5173")
+                        .header("Access-Control-Request-Method", "POST"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"));
     }
 
     private static ApplicationResponse sampleResponse() {
