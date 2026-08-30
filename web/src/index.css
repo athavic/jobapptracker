@@ -1,0 +1,22 @@
+@import 'tailwindcss';
+
+/* Design tokens. Defined once here so components never hardcode a hex value. */
+@theme {
+  --color-canvas: oklch(98.4% 0.002 250);
+  --color-surface: oklch(100% 0 0);
+  --color-line: oklch(92.6% 0.004 250);
+  --color-ink: oklch(24% 0.012 255);
+  --color-ink-soft: oklch(52% 0.014 255);
+  --color-brand: oklch(54% 0.13 195);
+  --color-brand-soft: oklch(95.5% 0.025 195);
+  --color-danger: oklch(55% 0.17 25);
+  --color-danger-soft: oklch(95.5% 0.03 25);
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-canvas text-ink antialiased;
+}
