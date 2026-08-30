@@ -59,6 +59,19 @@
       <version>${springdoc.version}</version>
     </dependency>
 
+    <!--
+      Restarts the app when its compiled classes change, instead of making you
+      stop and rerun maven. optional=true keeps it off the classpath of anything
+      that depends on this module, and Spring excludes it from the packaged jar
+      automatically - it never ships.
+    -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-devtools</artifactId>
+      <scope>runtime</scope>
+      <optional>true</optional>
+    </dependency>
+
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>

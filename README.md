@@ -70,6 +70,19 @@ cd web && npm run dev
 | `npm run db:reset` | **destroys the data** and recreates an empty schema |
 | `npm run db:psql` | a psql shell inside the container |
 
+### Changing code while it runs
+
+**Front end** — Vite hot-reloads. Save a file in `web/` and the browser updates in under
+a second, keeping React state. Nothing to restart.
+
+**Back end** — `spring-boot-devtools` restarts the API when its compiled classes change,
+in under a second rather than the ~4s of a cold boot. But something has to do the
+compiling: hit Build in the IDE (Ctrl+F9 in IntelliJ), or run `mvn -f api/pom.xml compile`
+in another terminal. Editing a `.java` file alone does nothing until it is compiled.
+
+devtools is `optional` and `runtime`-scoped, so Spring leaves it out of the packaged jar.
+It never ships.
+
 `dev:stop` exists because Ctrl-C is not the only way a dev server dies. Close the terminal
 window or stop it from the IDE and, on Windows, the child java and node processes outlive
 their parent and keep holding the ports - so the next `npm run dev` fails with
