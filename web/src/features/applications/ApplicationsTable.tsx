@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import type { Application, ApplicationStatus } from '../../api/client'
 import { formatRelative, formatSalary, titleCase } from '../../lib/format'
+import { EditApplicationDialog } from './EditApplicationDialog'
 import { StatusBadge } from './StatusBadge'
 import { useChangeStatus } from './hooks'
 
@@ -94,6 +96,12 @@ function RoleCell({ application }: { application: Application }) {
 }
 
 export function ApplicationsTable({ applications }: { applications: Application[] }) {
+  // The id rather than the application itself: after an edit the list refetches
+  // and hands down fresh objects, and holding a copy here would leave the
+  // dialog showing a stale status badge.
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const editing = applications.find((application) => application.id === editingId) ?? null
+
   if (applications.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-line bg-surface px-6 py-12 text-center">
@@ -148,13 +156,33 @@ export function ApplicationsTable({ applications }: { applications: Application[
                 {formatRelative(application.createdAt)}
               </td>
 
-              <td className="px-4 py-3 text-right">
-                <StatusControl application={application} />
+              <td className="px-4 py-3">
+                <div className="flex items-center justify-end gap-2">
+                  <StatusControl application={application} />
+                  <button
+                    type="button"
+                    onClick={() => setEditingId(application.id)}
+                    className="rounded-md border border-line px-2 py-1 text-xs text-ink-soft transition hover:border-brand hover:text-brand"
+                  >
+                    Edit
+                    <span className="sr-only"> {application.roleTitle}</span>
+                  </button>
+                </div>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+
+      {editing && (
+        <EditApplicationDialog
+          // Remounting on id change resets the form to the new row's values;
+          // without it the dialog would keep the previous row's edits.
+          key={editing.id}
+          application={editing}
+          onClose={() => setEditingId(null)}
+        />
+      )}
     </div>
   )
 }

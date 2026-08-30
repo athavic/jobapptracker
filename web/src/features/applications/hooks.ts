@@ -4,6 +4,7 @@ import {
   unwrap,
   type ApplicationStatus,
   type CreateApplicationBody,
+  type UpdateApplicationBody,
 } from '../../api/client'
 
 export interface ApplicationFilters {
@@ -59,6 +60,23 @@ export function useCreateApplication() {
     onSuccess: () => {
       // Refetch the list so the new row appears. Without this the cache still
       // holds the old page and nothing visibly happens.
+      void queryClient.invalidateQueries({ queryKey: applicationKeys.all })
+    },
+  })
+}
+
+export function useUpdateApplication() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: UpdateApplicationBody }) =>
+      unwrap(
+        api.PATCH('/api/v1/applications/{id}', {
+          params: { path: { id } },
+          body,
+        }),
+      ),
+    onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: applicationKeys.all })
     },
   })

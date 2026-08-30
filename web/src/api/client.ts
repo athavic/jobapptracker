@@ -17,6 +17,7 @@ export type Application = components['schemas']['ApplicationResponse']
 export type ApplicationStatus = Application['status']
 export type RemoteType = NonNullable<Application['remoteType']>
 export type CreateApplicationBody = components['schemas']['CreateApplicationRequest']
+export type UpdateApplicationBody = components['schemas']['UpdateApplicationRequest']
 
 /** The error shape GlobalExceptionHandler returns for every failure. */
 export interface ProblemDetail {
