@@ -4,7 +4,7 @@
   "private": true,
   "description": "Job application tracker - dev task runner for the whole stack",
   "scripts": {
-    "dev": "npm run db:up && concurrently -n api,web -c cyan,magenta -k --handle-input \"npm:dev:api\" \"npm:dev:web\"",
+    "dev": "npm run db:up && concurrently -n api,web -c cyan,magenta -k \"npm:dev:api\" \"npm:dev:web\"",
     "dev:api": "mvn -q -f api/pom.xml spring-boot:run",
     "dev:web": "npm --prefix web run dev",
     "dev:stop": "node scripts/stop-dev.mjs",
