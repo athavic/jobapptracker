@@ -1,0 +1,10 @@
+# Normalize line endings so Windows checkouts stop rewriting every file.
+* text=auto eol=lf
+
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+
+*.jar  binary
+*.png  binary
+*.jpg  binary
+*.ico  binary

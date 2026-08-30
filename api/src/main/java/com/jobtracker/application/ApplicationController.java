@@ -6,6 +6,7 @@ import com.jobtracker.application.dto.CreateApplicationRequest;
 import com.jobtracker.application.dto.PageResponse;
 import com.jobtracker.application.dto.UpdateApplicationRequest;
 import jakarta.validation.Valid;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -42,6 +43,10 @@ public class ApplicationController {
             @RequestParam(required = false) ApplicationStatus status,
             @RequestParam(required = false) String company,
             @RequestParam(defaultValue = "false") boolean includeArchived,
+            // @ParameterObject flattens Pageable into page/size/sort in the OpenAPI
+            // spec. Without it springdoc documents one opaque "pageable" object,
+            // which is not what Spring actually accepts on the wire.
+            @ParameterObject
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
             Pageable pageable) {
 
