@@ -4,9 +4,9 @@ A job application tracker with an automation dashboard. Four services, one sourc
 
 | Piece | Stack | Status |
 |---|---|---|
-| `api/` | Spring Boot 3.5 · Java 17 | **Phase 1 — working** |
-| Database | PostgreSQL 17 (Docker) | **Phase 0 — working** |
-| `web/` | React · TypeScript · Vite | not started (phase 2) |
+| Database | PostgreSQL 17 (Docker) | **phase 0 — working** |
+| `api/` | Spring Boot 3.5 · Java 17 | **phase 1 — working** |
+| `web/` | React 19 · TypeScript 5 · Vite 8 · Tailwind 4 | **phase 2 — working** |
 | `automation/` | Python 3.14 | not started (phase 3) |
 
 Architecture and full build plan: [Job Tracker Blueprint](https://claude.ai/code/artifact/e244d427-b199-4c28-83c6-b5f85d882342)
@@ -15,7 +15,7 @@ Architecture and full build plan: [Job Tracker Blueprint](https://claude.ai/code
 
 ## Before you start
 
-You need Docker Desktop **running**, and Maven (which uses `JAVA_HOME`, currently JDK 17).
+You need Docker Desktop **running**, Maven (which uses `JAVA_HOME`, currently JDK 17), and Node.
 
 > **Port note:** this machine already runs a native PostgreSQL 18 Windows service on
 > **5432**. The Docker container therefore publishes **5433** on the host. If you ever see
@@ -24,27 +24,29 @@ You need Docker Desktop **running**, and Maven (which uses `JAVA_HOME`, currentl
 
 ## Run it
 
+Three terminals.
+
 ```bash
 docker compose up -d
 ```
-
-Then, in a second terminal:
 
 ```bash
 cd api && mvn spring-boot:run
 ```
 
-- API: <http://localhost:8080/api/v1/applications>
-- Swagger UI: <http://localhost:8080/swagger-ui.html>
-- OpenAPI spec: <http://localhost:8080/v3/api-docs> — phase 2 generates TypeScript types from this
-
-Stop the database with:
-
 ```bash
-docker compose down
+cd web && npm run dev
 ```
 
-Add `-v` to that command to also delete the data volume and start from an empty schema.
+| | |
+|---|---|
+| App | <http://localhost:5173> |
+| API | <http://localhost:8080/api/v1/applications> |
+| Swagger UI | <http://localhost:8080/swagger-ui.html> |
+| OpenAPI spec | <http://localhost:8080/v3/api-docs> |
+
+Stop the database with `docker compose down`. Add `-v` to also drop the data volume and
+start from an empty schema.
 
 ## Test it
 
@@ -52,8 +54,14 @@ Add `-v` to that command to also delete the data volume and start from an empty 
 cd api && mvn test
 ```
 
-Ten tests, no database needed: the lifecycle rules run as plain unit tests, and the
+Eleven tests, no database needed: the lifecycle rules run as plain unit tests, and the
 controller runs as a `@WebMvcTest` slice with the service mocked.
+
+```bash
+cd web && npm run build
+```
+
+Runs `tsc -b` before bundling, so type errors fail the build.
 
 ## Poke at the database directly
 
@@ -61,17 +69,50 @@ controller runs as a `@WebMvcTest` slice with the service mocked.
 docker exec -it jobtracker-postgres psql -U jobtracker -d jobtracker
 ```
 
-Useful once you are in: `\dt` lists tables, `\d job_application` describes one,
-`\q` quits. `flyway_schema_history` is Flyway's own bookkeeping table — look at it
-to see exactly which migrations have run.
+`\dt` lists tables, `\d job_application` describes one, `\q` quits.
+`flyway_schema_history` is Flyway's own bookkeeping — look at it to see which migrations
+have run.
 
 ---
 
-## What phase 1 actually built
+## The contract between `api/` and `web/`
+
+This is the part worth understanding, because it is what makes the two halves safe to
+change independently.
 
 ```
-api/src/main/java/com/jobtracker/
-  JobTrackerApplication.java
+Java DTO records  ──springdoc──>  /v3/api-docs  ──openapi-typescript──>  web/src/api/schema.d.ts
+```
+
+**After changing any DTO, enum, or endpoint in `api/`:**
+
+```bash
+cd web && npm run generate:api
+```
+
+with the API running. Then `npm run build` — TypeScript will name every component that
+depended on the old shape. That is the whole point: the compiler, not a runtime 500, tells
+you what a backend change broke.
+
+`schema.d.ts` is committed deliberately. The app builds without a running API, and a diff
+on that file shows exactly how the contract moved.
+
+Two annotations make the generated types usable, and both are easy to forget:
+
+- **`@Schema(requiredMode = REQUIRED)`** on response fields that are always present.
+  Without it springdoc calls everything optional and the TypeScript is all `| undefined`.
+- **`@ParameterObject`** on the `Pageable` argument. Without it springdoc documents one
+  opaque `pageable` object instead of the flat `page` / `size` / `sort` params Spring
+  actually binds.
+
+---
+
+## What is built
+
+### `api/` — the system of record
+
+```
+com/jobtracker/
   application/
     ApplicationController.java      HTTP only — routing, status codes, @Valid
     ApplicationService.java         all the decisions live here
@@ -79,16 +120,14 @@ api/src/main/java/com/jobtracker/
     ApplicationMapper.java          entity -> DTO, inside the transaction
     ApplicationStatus.java          the lifecycle and its legal transitions
     JobApplication.java             @Entity
-    JobApplicationRepository.java
     dto/                            records — the API contract
   company/
   common/
-    GlobalExceptionHandler.java     every error as RFC 9457 problem detail
-api/src/main/resources/db/migration/
+    GlobalExceptionHandler.java     every error as an RFC 9457 problem detail
+    WebConfig.java                  CORS for the Vite dev server
+resources/db/migration/
   V1__initial_schema.sql            company + job_application
 ```
-
-### Endpoints
 
 | | Path | |
 |---|---|---|
@@ -100,40 +139,47 @@ api/src/main/resources/db/migration/
 | `POST` | `/api/v1/applications/{id}/archive` | |
 | `DELETE` | `/api/v1/applications/{id}` | really deletes; prefer archive |
 
-Try the interesting one:
+### `web/` — the dashboard
 
-```bash
-curl -X POST http://localhost:8080/api/v1/applications/1/status -H "Content-Type: application/json" -d "{\"status\":\"ACCEPTED\"}"
 ```
-
-From `SAVED` that returns **409** with a message naming the transitions that *are* legal.
-That rule lives in `ApplicationStatus`, gets enforced in `ApplicationService.changeStatus`,
-and will be the same rule the Python email job hits in phase 5.
+web/src/
+  api/
+    schema.d.ts        generated — do not hand-edit
+    client.ts          typed client, ApiError, unwrap()
+  features/applications/
+    ApplicationsPage.tsx    filters + paging
+    ApplicationsTable.tsx   rows + the status control
+    CreateApplicationForm.tsx
+    StatusBadge.tsx
+    hooks.ts                queries, mutations, query keys
+  components/ErrorNotice.tsx
+  lib/                 formatting, query client
+```
 
 ### Decisions worth understanding
 
 - **Flyway owns the schema; Hibernate only validates it.** `ddl-auto: validate` means
   startup fails loudly if the entities and the migrations disagree. That failure is the
   feature. Never edit an applied migration — add `V2__...sql`.
-- **`open-in-view: false`.** No lazy loading outside a transaction, so the service must map
-  to DTOs before returning. This is why `ApplicationMapper` is called where it is.
-- **The list query is a fetch join, not N+1.** `ApplicationSpecs.fetchCompany()` loads
-  companies in the same query. `show-sql: true` is on — watch the log and count the
-  `select` statements when you change something.
+- **`open-in-view: false`.** No lazy loading outside a transaction, so the service maps to
+  DTOs before returning. That is why `ApplicationMapper` is called where it is.
+- **The list query is a fetch join, not N+1.** One request issues two statements: the
+  paging count and one joined select. `show-sql: true` is on — watch the log and count
+  them when you change the query.
 - **Status is not a PATCH field.** It moves through its own endpoint so a transition can
   never be smuggled in as an ordinary field update.
-- **DTOs, never entities, at the HTTP boundary.** A column rename should not be a breaking
-  API change.
-
-### Sample data
-
-Two applications (Stripe, Linear) are already in the database from the smoke test. Wipe
-them with `docker compose down -v` if you want a clean slate.
+- **The UI has no copy of the lifecycle.** The status dropdown renders from
+  `allowedNextStatuses`, which the server computes from the same enum it enforces. The
+  rules cannot drift because they exist once.
+- **Mutations invalidate, they do not patch the cache.** Simpler, and always correct.
 
 ---
 
-## Next: phase 2
+## Next: phase 3
 
-Scaffold `web/` with Vite, generate TypeScript types from `/v3/api-docs`, and build the
-list plus create form against the running API. You will hit CORS immediately — that is
-expected, and the fix goes in `common/` as a `WebMvcConfigurer`.
+The first Python worker. `automation/` gets a typed `httpx` client, pydantic models
+mirroring the DTOs, and the `nudge_stale` job — find applications with no movement in N
+days and flag them. No scraping yet; it is a pure API consumer, which is the point.
+
+That also needs `automation_run` (a new migration and endpoint) so jobs record their own
+executions and the dashboard can show when each last ran.
