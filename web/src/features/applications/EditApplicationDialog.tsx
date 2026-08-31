@@ -10,6 +10,32 @@ const inputClass =
 
 const labelClass = 'block text-xs font-medium text-ink-soft mb-1'
 
+const CURRENCIES = [
+  ['USD', 'US Dollar'],
+  ['CAD', 'Canadian Dollar'],
+  ['EUR', 'Euro'],
+  ['GBP', 'British Pound'],
+  ['AUD', 'Australian Dollar'],
+  ['NZD', 'New Zealand Dollar'],
+  ['CHF', 'Swiss Franc'],
+  ['JPY', 'Japanese Yen'],
+  ['CNY', 'Chinese Yuan'],
+  ['HKD', 'Hong Kong Dollar'],
+  ['SGD', 'Singapore Dollar'],
+  ['INR', 'Indian Rupee'],
+  ['KRW', 'South Korean Won'],
+  ['BRL', 'Brazilian Real'],
+  ['MXN', 'Mexican Peso'],
+  ['SEK', 'Swedish Krona'],
+  ['NOK', 'Norwegian Krone'],
+  ['DKK', 'Danish Krone'],
+  ['PLN', 'Polish Zloty'],
+  ['CZK', 'Czech Koruna'],
+  ['AED', 'UAE Dirham'],
+  ['ILS', 'Israeli New Shekel'],
+  ['ZAR', 'South African Rand'],
+] as const
+
 /** The editable fields, as strings, because that is what inputs deal in. */
 interface FormState {
   companyName: string
@@ -63,6 +89,7 @@ export function EditApplicationDialog({
 
   const updateApplication = useUpdateApplication()
   const changeStatus = useChangeStatus()
+  const currencyIsListed = CURRENCIES.some(([code]) => code === form.currency)
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -181,14 +208,24 @@ export function EditApplicationDialog({
             <label className={labelClass} htmlFor="edit-currency">
               Currency
             </label>
-            <input
+            <select
               id="edit-currency"
-              maxLength={3}
               className={inputClass}
               value={form.currency}
               onChange={(e) => set('currency', e.target.value)}
-              placeholder="USD"
-            />
+            >
+              <option value="" disabled>
+                Select currency
+              </option>
+              {!currencyIsListed && form.currency && (
+                <option value={form.currency}>{form.currency} — Existing value</option>
+              )}
+              {CURRENCIES.map(([code, name]) => (
+                <option key={code} value={code}>
+                  {code} — {name}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>
