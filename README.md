@@ -283,3 +283,10 @@ automation makes worth asking: *did I move this, or did a bot?*
 
 `ApplicationService.changeStatus` and `ChangeStatusRequest.note` are already shaped for
 it; the note is currently accepted and dropped.
+
+Phase 5 is now **multi-user** — workspaces, Google sign-in, scoped queries and row-level
+security — which moves the scraper to 6, Gmail ingestion to 7 and deployment to 8. It sits
+there rather than at the end because `job_posting` and the Gmail job both get harder to
+retrofit, and because phase 4's events table is what makes a shared workspace legible.
+Sections 12 and 13 of the [blueprint](https://claude.ai/code/artifact/e244d427-b199-4c28-83c6-b5f85d882342)
+have the reasoning and the seven-step plan.
