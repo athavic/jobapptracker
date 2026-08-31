@@ -1,5 +1,6 @@
 package com.jobtracker.common;
 
+import com.jobtracker.automation.RunAlreadyFinishedException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -29,6 +30,17 @@ public class GlobalExceptionHandler {
     ProblemDetail onInvalidTransition(InvalidStatusTransitionException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
         problem.setTitle("Illegal status transition");
+        return problem;
+    }
+
+    /**
+     * Completing an automation run twice. Also a 409: the request is well formed,
+     * it just contradicts the state the resource is already in.
+     */
+    @ExceptionHandler(RunAlreadyFinishedException.class)
+    ProblemDetail onRunAlreadyFinished(RunAlreadyFinishedException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problem.setTitle("Run already finished");
         return problem;
     }
 

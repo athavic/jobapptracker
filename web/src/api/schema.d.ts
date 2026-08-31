@@ -4,7 +4,7 @@
  */
 
 export interface paths {
-    "/api/v1/applications": {
+    "/api/v1/automation/runs": {
         parameters: {
             query?: never;
             header?: never;
@@ -12,6 +12,38 @@ export interface paths {
             cookie?: never;
         };
         get: operations["list"];
+        put?: never;
+        post: operations["start"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/automation/runs/{id}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["complete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/applications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list_1"];
         put?: never;
         post: operations["create"];
         delete?: never;
@@ -68,10 +100,84 @@ export interface paths {
         patch: operations["update"];
         trace?: never;
     };
+    "/api/v1/automation/runs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/automation/runs/latest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["latest"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        StartRunRequest: {
+            jobName: string;
+            /** @enum {string} */
+            triggerSource?: "MANUAL" | "SCHEDULE";
+            /** Format: date-time */
+            startedAt?: string;
+        };
+        AutomationRunResponse: {
+            /** Format: int64 */
+            id: number;
+            jobName: string;
+            /** @enum {string} */
+            status: "RUNNING" | "SUCCEEDED" | "FAILED";
+            /** @enum {string} */
+            triggerSource: "MANUAL" | "SCHEDULE";
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            finishedAt?: string;
+            /** Format: int32 */
+            itemsScanned: number;
+            /** Format: int32 */
+            itemsAffected: number;
+            message?: string;
+            details?: {
+                [key: string]: unknown;
+            };
+        };
+        CompleteRunRequest: {
+            /** @enum {string} */
+            status: "RUNNING" | "SUCCEEDED" | "FAILED";
+            /** Format: int32 */
+            itemsScanned?: number;
+            /** Format: int32 */
+            itemsAffected?: number;
+            message?: string;
+            details?: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            finishedAt?: string;
+        };
         CreateApplicationRequest: {
             companyName: string;
             roleTitle: string;
@@ -156,6 +262,19 @@ export interface components {
             appliedAt?: string;
             archived?: boolean;
         };
+        PageResponseAutomationRunResponse: {
+            content: components["schemas"]["AutomationRunResponse"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            size: number;
+            /** Format: int64 */
+            totalElements: number;
+            /** Format: int32 */
+            totalPages: number;
+            first: boolean;
+            last: boolean;
+        };
         PageResponseApplicationResponse: {
             content: components["schemas"]["ApplicationResponse"][];
             /** Format: int32 */
@@ -179,6 +298,84 @@ export interface components {
 export type $defs = Record<string, never>;
 export interface operations {
     list: {
+        parameters: {
+            query?: {
+                jobName?: string;
+                /** @description Zero-based page index (0..N) */
+                page?: number;
+                /** @description The size of the page to be returned */
+                size?: number;
+                /** @description Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported. */
+                sort?: string[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PageResponseAutomationRunResponse"];
+                };
+            };
+        };
+    };
+    start: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartRunRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AutomationRunResponse"];
+                };
+            };
+        };
+    };
+    complete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompleteRunRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AutomationRunResponse"];
+                };
+            };
+        };
+    };
+    list_1: {
         parameters: {
             query?: {
                 status?: "DISCOVERED" | "SAVED" | "APPLIED" | "SCREEN" | "INTERVIEW" | "OFFER" | "ACCEPTED" | "REJECTED" | "GHOSTED" | "WITHDRAWN";
@@ -342,6 +539,48 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApplicationResponse"];
+                };
+            };
+        };
+    };
+    get_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AutomationRunResponse"];
+                };
+            };
+        };
+    };
+    latest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AutomationRunResponse"][];
                 };
             };
         };
