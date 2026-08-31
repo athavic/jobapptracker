@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import type { Application, ApplicationStatus, UpdateApplicationBody } from '../../api/client'
+import type {
+  Application,
+  ApplicationStatus,
+  SalaryPeriod,
+  UpdateApplicationBody,
+} from '../../api/client'
 import { ErrorNotice } from '../../components/ErrorNotice'
+import { CURRENCY_OPTIONS } from '../../lib/currencies'
 import { titleCase } from '../../lib/format'
 import { StatusBadge } from './StatusBadge'
 import { useChangeStatus, useUpdateApplication } from './hooks'
@@ -10,31 +16,7 @@ const inputClass =
 
 const labelClass = 'block text-xs font-medium text-ink-soft mb-1'
 
-const CURRENCIES = [
-  ['USD', 'US Dollar'],
-  ['CAD', 'Canadian Dollar'],
-  ['EUR', 'Euro'],
-  ['GBP', 'British Pound'],
-  ['AUD', 'Australian Dollar'],
-  ['NZD', 'New Zealand Dollar'],
-  ['CHF', 'Swiss Franc'],
-  ['JPY', 'Japanese Yen'],
-  ['CNY', 'Chinese Yuan'],
-  ['HKD', 'Hong Kong Dollar'],
-  ['SGD', 'Singapore Dollar'],
-  ['INR', 'Indian Rupee'],
-  ['KRW', 'South Korean Won'],
-  ['BRL', 'Brazilian Real'],
-  ['MXN', 'Mexican Peso'],
-  ['SEK', 'Swedish Krona'],
-  ['NOK', 'Norwegian Krone'],
-  ['DKK', 'Danish Krone'],
-  ['PLN', 'Polish Zloty'],
-  ['CZK', 'Czech Koruna'],
-  ['AED', 'UAE Dirham'],
-  ['ILS', 'Israeli New Shekel'],
-  ['ZAR', 'South African Rand'],
-] as const
+type SalaryMode = 'FIXED' | 'RANGE'
 
 /** The editable fields, as strings, because that is what inputs deal in. */
 interface FormState {
@@ -42,12 +24,20 @@ interface FormState {
   roleTitle: string
   location: string
   jobUrl: string
+  salaryMode: SalaryMode
+  salaryAmount: string
   salaryMin: string
   salaryMax: string
   currency: string
+  salaryPeriod: SalaryPeriod
 }
 
 function toFormState(application: Application): FormState {
+  const salaryIsRange =
+    application.salaryMin != null &&
+    application.salaryMax != null &&
+    application.salaryMin !== application.salaryMax
+
   // Every field is a string here. Passing undefined to an input's value turns a
   // controlled input into an uncontrolled one, and React then stops updating it.
   return {
@@ -55,14 +45,22 @@ function toFormState(application: Application): FormState {
     roleTitle: application.roleTitle,
     location: application.location ?? '',
     jobUrl: application.jobUrl ?? '',
+    salaryMode: salaryIsRange ? 'RANGE' : 'FIXED',
+    salaryAmount: (application.salaryMin ?? application.salaryMax)?.toString() ?? '',
     salaryMin: application.salaryMin?.toString() ?? '',
     salaryMax: application.salaryMax?.toString() ?? '',
     currency: application.currency ?? '',
+    salaryPeriod: application.salaryPeriod ?? 'ANNUAL',
   }
 }
 
 function toRequestBody(form: FormState): UpdateApplicationBody {
   const number = (value: string) => (value.trim() === '' ? undefined : Number(value))
+  const fixedAmount = number(form.salaryAmount)
+  const hasSalary =
+    form.salaryMode === 'FIXED'
+      ? fixedAmount != null
+      : number(form.salaryMin) != null || number(form.salaryMax) != null
 
   return {
     companyName: form.companyName.trim(),
@@ -71,9 +69,10 @@ function toRequestBody(form: FormState): UpdateApplicationBody {
     // which is how a field gets cleared.
     location: form.location,
     jobUrl: form.jobUrl,
-    salaryMin: number(form.salaryMin),
-    salaryMax: number(form.salaryMax),
+    salaryMin: form.salaryMode === 'FIXED' ? fixedAmount : number(form.salaryMin),
+    salaryMax: form.salaryMode === 'FIXED' ? fixedAmount : number(form.salaryMax),
     currency: form.currency.trim() === '' ? undefined : form.currency.trim(),
+    salaryPeriod: hasSalary ? form.salaryPeriod : undefined,
   }
 }
 
@@ -89,7 +88,8 @@ export function EditApplicationDialog({
 
   const updateApplication = useUpdateApplication()
   const changeStatus = useChangeStatus()
-  const currencyIsListed = CURRENCIES.some(([code]) => code === form.currency)
+  const currencyIsListed = CURRENCY_OPTIONS.some(([code]) => code === form.currency)
+  const amountStep = form.salaryPeriod === 'HOURLY' ? '0.01' : '1'
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -175,34 +175,85 @@ export function EditApplicationDialog({
           </div>
 
           <div>
-            <label className={labelClass} htmlFor="edit-salary-min">
-              Salary min
+            <label className={labelClass} htmlFor="edit-salary-mode">
+              Salary format
             </label>
-            <input
-              id="edit-salary-min"
-              type="number"
-              min="0"
+            <select
+              id="edit-salary-mode"
               className={inputClass}
-              value={form.salaryMin}
-              onChange={(e) => set('salaryMin', e.target.value)}
-              placeholder="120000"
-            />
+              value={form.salaryMode}
+              onChange={(e) => set('salaryMode', e.target.value as SalaryMode)}
+            >
+              <option value="FIXED">Fixed amount</option>
+              <option value="RANGE">Salary range</option>
+            </select>
           </div>
 
           <div>
-            <label className={labelClass} htmlFor="edit-salary-max">
-              Salary max
+            <label className={labelClass} htmlFor="edit-salary-period">
+              Pay period
             </label>
-            <input
-              id="edit-salary-max"
-              type="number"
-              min="0"
+            <select
+              id="edit-salary-period"
               className={inputClass}
-              value={form.salaryMax}
-              onChange={(e) => set('salaryMax', e.target.value)}
-              placeholder="160000"
-            />
+              value={form.salaryPeriod}
+              onChange={(e) => set('salaryPeriod', e.target.value as SalaryPeriod)}
+            >
+              <option value="ANNUAL">Annual</option>
+              <option value="HOURLY">Hourly</option>
+            </select>
           </div>
+
+          {form.salaryMode === 'FIXED' ? (
+            <div>
+              <label className={labelClass} htmlFor="edit-salary-amount">
+                Amount
+              </label>
+              <input
+                id="edit-salary-amount"
+                type="number"
+                min="0"
+                step={amountStep}
+                className={inputClass}
+                value={form.salaryAmount}
+                onChange={(e) => set('salaryAmount', e.target.value)}
+                placeholder={form.salaryPeriod === 'HOURLY' ? '27.50' : '120000'}
+              />
+            </div>
+          ) : (
+            <>
+              <div>
+                <label className={labelClass} htmlFor="edit-salary-min">
+                  Minimum
+                </label>
+                <input
+                  id="edit-salary-min"
+                  type="number"
+                  min="0"
+                  step={amountStep}
+                  className={inputClass}
+                  value={form.salaryMin}
+                  onChange={(e) => set('salaryMin', e.target.value)}
+                  placeholder={form.salaryPeriod === 'HOURLY' ? '25.00' : '120000'}
+                />
+              </div>
+              <div>
+                <label className={labelClass} htmlFor="edit-salary-max">
+                  Maximum
+                </label>
+                <input
+                  id="edit-salary-max"
+                  type="number"
+                  min="0"
+                  step={amountStep}
+                  className={inputClass}
+                  value={form.salaryMax}
+                  onChange={(e) => set('salaryMax', e.target.value)}
+                  placeholder={form.salaryPeriod === 'HOURLY' ? '35.00' : '160000'}
+                />
+              </div>
+            </>
+          )}
 
           <div>
             <label className={labelClass} htmlFor="edit-currency">
@@ -220,7 +271,7 @@ export function EditApplicationDialog({
               {!currencyIsListed && form.currency && (
                 <option value={form.currency}>{form.currency} — Existing value</option>
               )}
-              {CURRENCIES.map(([code, name]) => (
+              {CURRENCY_OPTIONS.map(([code, name]) => (
                 <option key={code} value={code}>
                   {code} — {name}
                 </option>

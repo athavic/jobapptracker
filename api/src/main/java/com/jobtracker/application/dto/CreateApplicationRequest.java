@@ -2,15 +2,17 @@ package com.jobtracker.application.dto;
 
 import com.jobtracker.application.ApplicationStatus;
 import com.jobtracker.application.RemoteType;
+import com.jobtracker.application.SalaryPeriod;
 import com.jobtracker.common.ValidationPatterns;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Size;
 
 import java.time.Instant;
+import java.math.BigDecimal;
 
 /**
  * What a client sends to create an application.
@@ -38,10 +40,12 @@ public record CreateApplicationRequest(
 
         RemoteType remoteType,
 
-        @PositiveOrZero Integer salaryMin,
-        @PositiveOrZero Integer salaryMax,
+        @DecimalMin("0.00") BigDecimal salaryMin,
+        @DecimalMin("0.00") BigDecimal salaryMax,
 
         @Size(min = 3, max = 3) String currency,
+
+        SalaryPeriod salaryPeriod,
 
         @Min(1) @Max(5) Integer priority,
 

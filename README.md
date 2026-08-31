@@ -101,7 +101,7 @@ their parent and keep holding the ports - so the next `npm run dev` fails with
 npm test
 ```
 
-Eleven tests, no database needed: the lifecycle rules run as plain unit tests, and the
+Sixteen tests, no database needed: the lifecycle rules run as plain unit tests, and the
 controller runs as a `@WebMvcTest` slice with the service mocked.
 
 ```bash

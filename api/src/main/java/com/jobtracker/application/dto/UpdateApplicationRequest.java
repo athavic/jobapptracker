@@ -1,14 +1,16 @@
 package com.jobtracker.application.dto;
 
 import com.jobtracker.application.RemoteType;
+import com.jobtracker.application.SalaryPeriod;
 import com.jobtracker.common.ValidationPatterns;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Size;
 
 import java.time.Instant;
+import java.math.BigDecimal;
 
 /**
  * PATCH semantics: every field is optional, and null means "leave this alone".
@@ -32,10 +34,12 @@ public record UpdateApplicationRequest(
 
         RemoteType remoteType,
 
-        @PositiveOrZero Integer salaryMin,
-        @PositiveOrZero Integer salaryMax,
+        @DecimalMin("0.00") BigDecimal salaryMin,
+        @DecimalMin("0.00") BigDecimal salaryMax,
 
         @Size(min = 3, max = 3) String currency,
+
+        SalaryPeriod salaryPeriod,
 
         @Min(1) @Max(5) Integer priority,
 

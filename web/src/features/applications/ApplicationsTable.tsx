@@ -149,6 +149,7 @@ export function ApplicationsTable({ applications }: { applications: Application[
                   application.salaryMin,
                   application.salaryMax,
                   application.currency,
+                  application.salaryPeriod,
                 )}
               </td>
 

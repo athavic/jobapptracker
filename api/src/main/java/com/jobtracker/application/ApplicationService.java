@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.math.BigDecimal;
 
 /**
  * Everything that is true about an application regardless of who is asking -
@@ -47,6 +48,8 @@ public class ApplicationService {
         application.setSalaryMin(request.salaryMin());
         application.setSalaryMax(request.salaryMax());
         application.setCurrency(normalizeCurrency(request.currency()));
+        application.setSalaryPeriod(defaultSalaryPeriod(
+                request.salaryPeriod(), request.salaryMin(), request.salaryMax()));
         application.setResumeVersion(blankToNull(request.resumeVersion()));
         application.setNotes(blankToNull(request.notes()));
 
@@ -117,6 +120,12 @@ public class ApplicationService {
         }
         if (request.currency() != null) {
             application.setCurrency(normalizeCurrency(request.currency()));
+        }
+        if (request.salaryPeriod() != null) {
+            application.setSalaryPeriod(request.salaryPeriod());
+        } else if (application.getSalaryPeriod() == null
+                && (application.getSalaryMin() != null || application.getSalaryMax() != null)) {
+            application.setSalaryPeriod(SalaryPeriod.ANNUAL);
         }
         if (request.priority() != null) {
             application.setPriority(request.priority());
@@ -196,6 +205,15 @@ public class ApplicationService {
         return currency == null ? null : currency.trim().toUpperCase();
     }
 
+    private static SalaryPeriod defaultSalaryPeriod(SalaryPeriod requested,
+                                                     BigDecimal minimum,
+                                                     BigDecimal maximum) {
+        if (requested != null) {
+            return requested;
+        }
+        return minimum != null || maximum != null ? SalaryPeriod.ANNUAL : null;
+    }
+
     /**
      * Empty string and null both mean "no value", and storing both means every
      * reader has to check for both. Collapse them here, at the one place data
@@ -214,9 +232,9 @@ public class ApplicationService {
      * constraint violation into a readable 400 for the caller.
      */
     private static void validateSalaryRange(JobApplication application) {
-        Integer min = application.getSalaryMin();
-        Integer max = application.getSalaryMax();
-        if (min != null && max != null && max < min) {
+        BigDecimal min = application.getSalaryMin();
+        BigDecimal max = application.getSalaryMax();
+        if (min != null && max != null && max.compareTo(min) < 0) {
             throw new IllegalArgumentException(
                     "salaryMax (" + max + ") must be greater than or equal to salaryMin (" + min + ")");
         }

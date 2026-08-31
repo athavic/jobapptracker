@@ -82,11 +82,11 @@ export interface components {
             location?: string;
             /** @enum {string} */
             remoteType?: "ONSITE" | "HYBRID" | "REMOTE";
-            /** Format: int32 */
             salaryMin?: number;
-            /** Format: int32 */
             salaryMax?: number;
             currency?: string;
+            /** @enum {string} */
+            salaryPeriod?: "ANNUAL" | "HOURLY";
             /** Format: int32 */
             priority?: number;
             resumeVersion?: string;
@@ -107,11 +107,11 @@ export interface components {
             location?: string;
             /** @enum {string} */
             remoteType?: "ONSITE" | "HYBRID" | "REMOTE";
-            /** Format: int32 */
             salaryMin?: number;
-            /** Format: int32 */
             salaryMax?: number;
             currency?: string;
+            /** @enum {string} */
+            salaryPeriod?: "ANNUAL" | "HOURLY";
             /** Format: int32 */
             priority: number;
             resumeVersion?: string;
@@ -143,11 +143,11 @@ export interface components {
             location?: string;
             /** @enum {string} */
             remoteType?: "ONSITE" | "HYBRID" | "REMOTE";
-            /** Format: int32 */
             salaryMin?: number;
-            /** Format: int32 */
             salaryMax?: number;
             currency?: string;
+            /** @enum {string} */
+            salaryPeriod?: "ANNUAL" | "HOURLY";
             /** Format: int32 */
             priority?: number;
             resumeVersion?: string;

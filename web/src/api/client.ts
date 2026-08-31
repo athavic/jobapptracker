@@ -16,6 +16,7 @@ export const api = createClient<paths>({
 export type Application = components['schemas']['ApplicationResponse']
 export type ApplicationStatus = Application['status']
 export type RemoteType = NonNullable<Application['remoteType']>
+export type SalaryPeriod = NonNullable<Application['salaryPeriod']>
 export type CreateApplicationBody = components['schemas']['CreateApplicationRequest']
 export type UpdateApplicationBody = components['schemas']['UpdateApplicationRequest']
 

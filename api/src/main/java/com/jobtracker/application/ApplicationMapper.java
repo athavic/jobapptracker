@@ -30,6 +30,7 @@ final class ApplicationMapper {
                 a.getSalaryMin(),
                 a.getSalaryMax(),
                 a.getCurrency(),
+                a.getSalaryPeriod(),
                 a.getPriority(),
                 a.getResumeVersion(),
                 a.getNotes(),

@@ -141,6 +141,38 @@ class ApplicationControllerTest {
                 .andExpect(status().isCreated());
     }
 
+    @Test
+    @DisplayName("accepts a fixed decimal hourly salary")
+    void createAcceptsFixedHourlySalary() throws Exception {
+        given(service.create(any())).willReturn(sampleResponse());
+
+        mockMvc.perform(post("/api/v1/applications")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "companyName": "Stripe",
+                                  "roleTitle": "Support Engineer",
+                                  "salaryMin": 27.50,
+                                  "salaryMax": 27.50,
+                                  "currency": "USD",
+                                  "salaryPeriod": "HOURLY"
+                                }
+                                """))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    @DisplayName("rejects a negative salary")
+    void createRejectsNegativeSalary() throws Exception {
+        mockMvc.perform(post("/api/v1/applications")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"companyName": "Stripe", "roleTitle": "Engineer", "salaryMin": -1}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors.salaryMin").exists());
+    }
+
     private static ApplicationResponse sampleResponse() {
         return new ApplicationResponse(
                 1L,
@@ -149,7 +181,7 @@ class ApplicationControllerTest {
                 ApplicationStatus.APPLIED,
                 Set.of(ApplicationStatus.SCREEN, ApplicationStatus.REJECTED),
                 "careers page", null, "Remote", RemoteType.REMOTE,
-                null, null, null, 3, null, null,
+                null, null, null, null, 3, null, null,
                 Instant.parse("2026-08-30T10:00:00Z"),
                 false,
                 Instant.parse("2026-08-30T10:00:00Z"),

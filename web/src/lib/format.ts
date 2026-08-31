@@ -29,17 +29,22 @@ export function formatSalary(
   min: number | undefined,
   max: number | undefined,
   currency: string | undefined,
+  period: 'ANNUAL' | 'HOURLY' | undefined,
 ): string {
   if (min == null && max == null) return '—'
+  const suffix = period === 'HOURLY' ? '/hour' : '/year'
   const money = (n: number) =>
     new Intl.NumberFormat(undefined, {
       style: 'currency',
       currency: currency || 'USD',
-      maximumFractionDigits: 0,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: period === 'HOURLY' ? 2 : 0,
     }).format(n)
 
-  if (min != null && max != null) return `${money(min)} – ${money(max)}`
-  return money((min ?? max) as number)
+  if (min != null && max != null && min !== max) {
+    return `${money(min)} – ${money(max)}${suffix}`
+  }
+  return `${money((min ?? max) as number)}${suffix}`
 }
 
 export function titleCase(value: string): string {

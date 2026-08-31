@@ -1,15 +1,39 @@
 import { useState, type FormEvent } from 'react'
-import type { CreateApplicationBody } from '../../api/client'
+import type { CreateApplicationBody, SalaryPeriod } from '../../api/client'
 import { ErrorNotice } from '../../components/ErrorNotice'
+import { CURRENCY_OPTIONS } from '../../lib/currencies'
 import { useCreateApplication } from './hooks'
 
-const EMPTY: CreateApplicationBody = {
+type SalaryMode = 'NONE' | 'FIXED' | 'RANGE'
+
+interface FormState {
+  companyName: string
+  roleTitle: string
+  status: NonNullable<CreateApplicationBody['status']>
+  location: string
+  jobUrl: string
+  source: string
+  salaryMode: SalaryMode
+  salaryAmount: string
+  salaryMin: string
+  salaryMax: string
+  currency: string
+  salaryPeriod: SalaryPeriod
+}
+
+const EMPTY: FormState = {
   companyName: '',
   roleTitle: '',
   status: 'SAVED',
   location: '',
   jobUrl: '',
   source: '',
+  salaryMode: 'NONE',
+  salaryAmount: '',
+  salaryMin: '',
+  salaryMax: '',
+  currency: 'USD',
+  salaryPeriod: 'ANNUAL',
 }
 
 const inputClass =
@@ -17,33 +41,46 @@ const inputClass =
 
 const labelClass = 'block text-xs font-medium text-ink-soft mb-1'
 
-export function CreateApplicationForm() {
-  const [form, setForm] = useState<CreateApplicationBody>(EMPTY)
-  const createApplication = useCreateApplication()
+const toNumber = (value: string) => (value.trim() === '' ? undefined : Number(value))
 
-  function set<K extends keyof CreateApplicationBody>(
-    key: K,
-    value: CreateApplicationBody[K],
-  ) {
+export function CreateApplicationForm() {
+  const [form, setForm] = useState<FormState>(EMPTY)
+  const createApplication = useCreateApplication()
+  const hasSalary = form.salaryMode !== 'NONE'
+  const amountStep = form.salaryPeriod === 'HOURLY' ? '0.01' : '1'
+
+  function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [key]: value }))
   }
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
 
-    createApplication.mutate(
-      {
-        ...form,
-        // Send undefined rather than "" so the server stores NULL instead of
-        // an empty string. Two ways to say "no value" is one too many.
-        location: form.location || undefined,
-        jobUrl: form.jobUrl || undefined,
-        source: form.source || undefined,
-        salaryMin: form.salaryMin || undefined,
-        salaryMax: form.salaryMax || undefined,
-      },
-      { onSuccess: () => setForm(EMPTY) },
-    )
+    const fixedAmount = toNumber(form.salaryAmount)
+    const body: CreateApplicationBody = {
+      companyName: form.companyName,
+      roleTitle: form.roleTitle,
+      status: form.status,
+      location: form.location || undefined,
+      jobUrl: form.jobUrl || undefined,
+      source: form.source || undefined,
+      salaryMin:
+        !hasSalary
+          ? undefined
+          : form.salaryMode === 'FIXED'
+            ? fixedAmount
+            : toNumber(form.salaryMin),
+      salaryMax:
+        !hasSalary
+          ? undefined
+          : form.salaryMode === 'FIXED'
+            ? fixedAmount
+            : toNumber(form.salaryMax),
+      currency: hasSalary ? form.currency : undefined,
+      salaryPeriod: hasSalary ? form.salaryPeriod : undefined,
+    }
+
+    createApplication.mutate(body, { onSuccess: () => setForm(EMPTY) })
   }
 
   return (
@@ -93,9 +130,8 @@ export function CreateApplicationForm() {
             id="status"
             className={inputClass}
             value={form.status}
-            onChange={(e) => set('status', e.target.value as CreateApplicationBody['status'])}
+            onChange={(e) => set('status', e.target.value as FormState['status'])}
           >
-            {/* Only the statuses a brand-new record can legitimately start in. */}
             <option value="DISCOVERED">Discovered</option>
             <option value="SAVED">Saved</option>
             <option value="APPLIED">Applied</option>
@@ -109,7 +145,7 @@ export function CreateApplicationForm() {
           <input
             id="location"
             className={inputClass}
-            value={form.location ?? ''}
+            value={form.location}
             onChange={(e) => set('location', e.target.value)}
             placeholder="Remote"
           />
@@ -123,11 +159,124 @@ export function CreateApplicationForm() {
             id="jobUrl"
             type="url"
             className={inputClass}
-            value={form.jobUrl ?? ''}
+            value={form.jobUrl}
             onChange={(e) => set('jobUrl', e.target.value)}
             placeholder="https://..."
           />
         </div>
+
+        <fieldset className="grid gap-4 border-t border-line pt-4 sm:col-span-2 sm:grid-cols-2">
+          <legend className="px-1 text-xs font-medium text-ink-soft">Compensation</legend>
+
+          <div>
+            <label className={labelClass} htmlFor="salary-mode">
+              Salary format
+            </label>
+            <select
+              id="salary-mode"
+              className={inputClass}
+              value={form.salaryMode}
+              onChange={(e) => set('salaryMode', e.target.value as SalaryMode)}
+            >
+              <option value="NONE">Not listed</option>
+              <option value="FIXED">Fixed amount</option>
+              <option value="RANGE">Salary range</option>
+            </select>
+          </div>
+
+          {hasSalary && (
+            <div>
+              <label className={labelClass} htmlFor="salary-period">
+                Pay period
+              </label>
+              <select
+                id="salary-period"
+                className={inputClass}
+                value={form.salaryPeriod}
+                onChange={(e) => set('salaryPeriod', e.target.value as SalaryPeriod)}
+              >
+                <option value="ANNUAL">Annual</option>
+                <option value="HOURLY">Hourly</option>
+              </select>
+            </div>
+          )}
+
+          {form.salaryMode === 'FIXED' && (
+            <div>
+              <label className={labelClass} htmlFor="salary-amount">
+                Amount
+              </label>
+              <input
+                id="salary-amount"
+                type="number"
+                min="0"
+                step={amountStep}
+                className={inputClass}
+                value={form.salaryAmount}
+                onChange={(e) => set('salaryAmount', e.target.value)}
+                placeholder={form.salaryPeriod === 'HOURLY' ? '27.50' : '120000'}
+                required
+              />
+            </div>
+          )}
+
+          {form.salaryMode === 'RANGE' && (
+            <>
+              <div>
+                <label className={labelClass} htmlFor="salary-min">
+                  Minimum
+                </label>
+                <input
+                  id="salary-min"
+                  type="number"
+                  min="0"
+                  step={amountStep}
+                  className={inputClass}
+                  value={form.salaryMin}
+                  onChange={(e) => set('salaryMin', e.target.value)}
+                  placeholder={form.salaryPeriod === 'HOURLY' ? '25.00' : '120000'}
+                  required
+                />
+              </div>
+              <div>
+                <label className={labelClass} htmlFor="salary-max">
+                  Maximum
+                </label>
+                <input
+                  id="salary-max"
+                  type="number"
+                  min="0"
+                  step={amountStep}
+                  className={inputClass}
+                  value={form.salaryMax}
+                  onChange={(e) => set('salaryMax', e.target.value)}
+                  placeholder={form.salaryPeriod === 'HOURLY' ? '35.00' : '160000'}
+                  required
+                />
+              </div>
+            </>
+          )}
+
+          {hasSalary && (
+            <div>
+              <label className={labelClass} htmlFor="salary-currency">
+                Currency
+              </label>
+              <select
+                id="salary-currency"
+                className={inputClass}
+                value={form.currency}
+                onChange={(e) => set('currency', e.target.value)}
+              >
+                {CURRENCY_OPTIONS.map(([code, name]) => (
+                  <option key={code} value={code}>
+                    {code} — {name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </fieldset>
       </div>
 
       {createApplication.isError && (

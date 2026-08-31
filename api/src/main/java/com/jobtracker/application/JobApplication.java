@@ -16,6 +16,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.Instant;
+import java.math.BigDecimal;
 
 @Entity
 @Table(name = "job_application")
@@ -57,14 +58,18 @@ public class JobApplication {
     @Column(name = "remote_type", length = 16)
     private RemoteType remoteType;
 
-    @Column(name = "salary_min")
-    private Integer salaryMin;
+    @Column(name = "salary_min", precision = 12, scale = 2)
+    private BigDecimal salaryMin;
 
-    @Column(name = "salary_max")
-    private Integer salaryMax;
+    @Column(name = "salary_max", precision = 12, scale = 2)
+    private BigDecimal salaryMax;
 
     @Column(length = 3)
     private String currency;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "salary_period", length = 16)
+    private SalaryPeriod salaryPeriod;
 
     @Column(nullable = false)
     private Integer priority = 3;
@@ -163,19 +168,19 @@ public class JobApplication {
         this.remoteType = remoteType;
     }
 
-    public Integer getSalaryMin() {
+    public BigDecimal getSalaryMin() {
         return salaryMin;
     }
 
-    public void setSalaryMin(Integer salaryMin) {
+    public void setSalaryMin(BigDecimal salaryMin) {
         this.salaryMin = salaryMin;
     }
 
-    public Integer getSalaryMax() {
+    public BigDecimal getSalaryMax() {
         return salaryMax;
     }
 
-    public void setSalaryMax(Integer salaryMax) {
+    public void setSalaryMax(BigDecimal salaryMax) {
         this.salaryMax = salaryMax;
     }
 
@@ -185,6 +190,14 @@ public class JobApplication {
 
     public void setCurrency(String currency) {
         this.currency = currency;
+    }
+
+    public SalaryPeriod getSalaryPeriod() {
+        return salaryPeriod;
+    }
+
+    public void setSalaryPeriod(SalaryPeriod salaryPeriod) {
+        this.salaryPeriod = salaryPeriod;
     }
 
     public Integer getPriority() {

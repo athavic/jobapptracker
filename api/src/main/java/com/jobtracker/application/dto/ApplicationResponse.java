@@ -2,9 +2,11 @@ package com.jobtracker.application.dto;
 
 import com.jobtracker.application.ApplicationStatus;
 import com.jobtracker.application.RemoteType;
+import com.jobtracker.application.SalaryPeriod;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.Instant;
+import java.math.BigDecimal;
 import java.util.Set;
 
 /**
@@ -40,9 +42,10 @@ public record ApplicationResponse(
         String jobUrl,
         String location,
         RemoteType remoteType,
-        Integer salaryMin,
-        Integer salaryMax,
+        BigDecimal salaryMin,
+        BigDecimal salaryMax,
         String currency,
+        SalaryPeriod salaryPeriod,
 
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
         Integer priority,
