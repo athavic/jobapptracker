@@ -37,7 +37,7 @@ const EMPTY: FormState = {
 }
 
 const inputClass =
-  'w-full rounded-md border border-line bg-surface px-3 py-2 text-sm outline-none placeholder:text-slate-400 focus:border-brand focus:ring-2 focus:ring-brand/20'
+  'w-full rounded-md border border-line bg-surface px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-brand focus:ring-2 focus:ring-brand/20'
 
 const labelClass = 'block text-xs font-medium text-ink-soft mb-1'
 
@@ -320,13 +320,13 @@ export function CreateApplicationForm() {
             <button
               type="submit"
               disabled={createApplication.isPending}
-              className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-on-solid transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {createApplication.isPending ? 'Saving…' : 'Add application'}
             </button>
 
             {createApplication.isSuccess && (
-              <span className="text-xs text-emerald-700">Added.</span>
+              <span className="text-xs text-positive-ink">Added.</span>
             )}
           </div>
         </div>

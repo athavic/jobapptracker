@@ -1,22 +1,165 @@
 @import 'tailwindcss';
 
-/* Design tokens. Defined once here so components never hardcode a hex value. */
+/*
+ * Design tokens. Defined once here so components never hardcode a hex value.
+ *
+ * This indirection is what makes dark mode cheap. Components ask for a *role*
+ * - `bg-surface`, `text-ink`, `ring-danger-line` - and the theme decides what
+ * that role looks like. Switching themes redefines the variables below; not a
+ * single component changes. The alternative, a `dark:` variant on every colour
+ * utility in the app, doubles the class list and drifts the moment someone
+ * adds a colour and forgets its pair.
+ *
+ * The rule that follows from that: a component that hardcodes `bg-slate-100`
+ * has opted out of theming and will stay light-mode-coloured forever.
+ */
 @theme {
+  /* Surfaces, lines and text. */
   --color-canvas: oklch(98.4% 0.002 250);
   --color-surface: oklch(100% 0 0);
   --color-line: oklch(92.6% 0.004 250);
   --color-ink: oklch(24% 0.012 255);
   --color-ink-soft: oklch(52% 0.014 255);
+  --color-muted: oklch(65% 0.012 255);
+
+  /* Foreground for anything sitting on a *solid* brand or positive fill. */
+  --color-on-solid: oklch(100% 0 0);
+
+  /* Brand / active. */
   --color-brand: oklch(54% 0.13 195);
   --color-brand-soft: oklch(95.5% 0.025 195);
+  --color-brand-ink: oklch(40% 0.07 195);
+  --color-brand-line: oklch(85% 0.06 195);
+
+  /* Not acted on yet. */
+  --color-neutral-soft: oklch(96.2% 0.003 250);
+  --color-neutral-ink: oklch(48% 0.012 255);
+  --color-neutral-line: oklch(91% 0.004 250);
+
+  /* Closed by you rather than by them - a heavier grey than `neutral`. */
+  --color-inert-soft: oklch(92.5% 0.004 250);
+  --color-inert-ink: oklch(40% 0.012 255);
+  --color-inert-line: oklch(87% 0.005 250);
+
+  /* In progress, outcome unknown. */
+  --color-warn-soft: oklch(96.5% 0.035 85);
+  --color-warn-ink: oklch(45% 0.09 70);
+  --color-warn-line: oklch(88% 0.07 85);
+
+  /*
+   * Going well. `positive` is darker than it looks like it wants to be: it is
+   * the one colour used as a *solid* fill behind 12px text (the ACCEPTED
+   * badge), and a lighter green there lands around 4:1 - under AA for small
+   * text. The old bg-emerald-600 had the same problem.
+   */
+  --color-positive: oklch(51% 0.125 155);
+  --color-positive-soft: oklch(96% 0.03 155);
+  --color-positive-ink: oklch(42% 0.09 155);
+  --color-positive-line: oklch(87% 0.06 155);
+
+  /* Dead ends and errors. */
   --color-danger: oklch(55% 0.17 25);
   --color-danger-soft: oklch(95.5% 0.03 25);
+  --color-danger-ink: oklch(43% 0.13 25);
+  --color-danger-line: oklch(87% 0.07 25);
 }
 
-html {
+/*
+ * Dark theme.
+ *
+ * `data-theme` is always stamped on <html> by the inline script in index.html,
+ * resolved from the stored choice or the OS preference - so this file needs one
+ * dark block rather than one for the explicit choice and another inside a
+ * `prefers-color-scheme` media query.
+ *
+ * Two things this palette deliberately is NOT:
+ *
+ * - It is not an inversion. Pure black reads as a hole rather than a surface,
+ *   so `canvas` is a lifted near-black that keeps the same slight blue-slate
+ *   bias as the light theme. Cards then sit *above* the page by getting
+ *   lighter, which is the same relationship light mode has, not a reversed one.
+ * - The accents are not reused. A colour tuned for contrast against white is
+ *   too dark against near-black, so every hue is lifted in lightness and pulled
+ *   back in chroma - saturated colour on a dark ground vibrates.
+ */
+:root[data-theme='dark'] {
+  --color-canvas: oklch(17.5% 0.008 255);
+  --color-surface: oklch(22.5% 0.009 255);
+  --color-line: oklch(31% 0.011 255);
+  --color-ink: oklch(94% 0.004 250);
+  --color-ink-soft: oklch(72% 0.012 255);
+  --color-muted: oklch(56% 0.012 255);
+
+  /*
+   * Flipped, and this one is easy to miss: in dark mode the brand fill is a
+   * light teal, so white text on it drops to roughly 2:1. The foreground of a
+   * solid fill has to be a token too, not a literal `text-white`.
+   */
+  --color-on-solid: oklch(17% 0.01 255);
+
+  --color-brand: oklch(74% 0.115 195);
+  --color-brand-soft: oklch(30% 0.05 195);
+  --color-brand-ink: oklch(83% 0.09 195);
+  --color-brand-line: oklch(42% 0.07 195);
+
+  --color-neutral-soft: oklch(27% 0.008 255);
+  --color-neutral-ink: oklch(74% 0.010 255);
+  --color-neutral-line: oklch(35% 0.010 255);
+
+  --color-inert-soft: oklch(32% 0.009 255);
+  --color-inert-ink: oklch(80% 0.010 255);
+  --color-inert-line: oklch(40% 0.011 255);
+
+  --color-warn-soft: oklch(31% 0.055 75);
+  --color-warn-ink: oklch(85% 0.10 85);
+  --color-warn-line: oklch(42% 0.075 75);
+
+  --color-positive: oklch(70% 0.13 155);
+  --color-positive-soft: oklch(29% 0.055 155);
+  --color-positive-ink: oklch(84% 0.11 155);
+  --color-positive-line: oklch(40% 0.075 155);
+
+  --color-danger: oklch(70% 0.15 25);
+  --color-danger-soft: oklch(30% 0.065 25);
+  --color-danger-ink: oklch(85% 0.09 25);
+  --color-danger-line: oklch(42% 0.10 25);
+}
+
+/*
+ * `color-scheme` is not decoration. It is what tells the browser to render the
+ * parts of the page we do not paint ourselves - scrollbars, the dropdown list a
+ * native <select> opens, date pickers, form control chrome, the default focus
+ * ring. Without it those stay bright white on a dark page, which is the single
+ * most obvious tell of a dark mode that was done with CSS colours alone. This
+ * app is full of <select>s, so it matters here more than usual.
+ */
+:root[data-theme='light'] {
   color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
 }
 
 body {
   @apply bg-canvas text-ink antialiased;
+}
+
+/*
+ * The modal scrim lives here rather than on the component, because it is one of
+ * the few colours that cannot be expressed as a single token: it has to darken
+ * in *both* themes. `bg-ink/20` would be right in light mode and a white haze
+ * in dark mode, since `ink` flips to near-white.
+ *
+ * The blur is what actually separates the two planes. That lets the scrim stay
+ * light enough to leave the board readable underneath, instead of a heavy wash
+ * that flattens the page to one grey.
+ */
+dialog::backdrop {
+  background: oklch(24% 0.012 255 / 0.2);
+  backdrop-filter: blur(4px);
+}
+
+:root[data-theme='dark'] dialog::backdrop {
+  background: oklch(0% 0 0 / 0.55);
 }

@@ -4,6 +4,41 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Job Tracker</title>
+
+    <!--
+      Resolve the theme before the first paint.
+
+      This has to be an inline, non-deferred script in <head>. React mounts
+      after the browser has already painted, so applying the theme in an effect
+      means a dark-mode user gets a white flash on every page load - brief, but
+      the most noticeable bug a dark mode can have.
+
+      No stored choice means "follow the OS", so nothing is written to storage
+      until the toggle is actually used. That is what lets the theme keep
+      tracking the system setting for anyone who never touches the button.
+
+      The storage key is duplicated in src/lib/theme.ts. It has to be: this
+      script cannot import a module and still run before paint. If you change it
+      in one place, change it in the other.
+    -->
+    <script>
+      ;(function () {
+        try {
+          var stored = localStorage.getItem('jobtracker-theme')
+          var theme =
+            stored === 'light' || stored === 'dark'
+              ? stored
+              : window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light'
+          document.documentElement.dataset.theme = theme
+        } catch (e) {
+          // Private mode can throw on localStorage access. A readable page in
+          // the wrong theme beats a blank one.
+          document.documentElement.dataset.theme = 'light'
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

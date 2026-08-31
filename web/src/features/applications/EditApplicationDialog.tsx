@@ -12,7 +12,7 @@ import { StatusBadge } from './StatusBadge'
 import { useChangeStatus, useUpdateApplication } from './hooks'
 
 const inputClass =
-  'w-full rounded-md border border-line bg-surface px-3 py-2 text-sm outline-none placeholder:text-slate-400 focus:border-brand focus:ring-2 focus:ring-brand/20'
+  'w-full rounded-md border border-line bg-surface px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-brand focus:ring-2 focus:ring-brand/20'
 
 const labelClass = 'block text-xs font-medium text-ink-soft mb-1'
 
@@ -134,20 +134,15 @@ export function EditApplicationDialog({
     )
   }
 
-  /*
-   * The backdrop is a light scrim plus a blur, not a heavy wash. 40% black over a
-   * near-white page flattens to solid grey and hides the board behind it. Blurring
-   * separates the two layers instead, so the dialog reads as sitting *on top of*
-   * the list rather than replacing it, and the row you clicked stays recognisable.
-   */
-  const backdrop = 'backdrop:bg-ink/20 backdrop:backdrop-blur-xs'
-
+  // The backdrop scrim is styled in index.css, not here: it is one of the few
+  // colours that has to darken in both themes, so it cannot come from a single
+  // token. `bg-ink/20` would be a white haze in dark mode.
   return (
     <dialog
       ref={dialogRef}
       onKeyDown={handleKeyDown}
       onClick={handleBackdropClick}
-      className={`m-auto w-full max-w-xl rounded-lg border border-line bg-surface p-0 text-ink ${backdrop}`}
+      className="m-auto w-full max-w-xl rounded-lg border border-line bg-surface p-0 text-ink"
     >
       <form onSubmit={handleSubmit} className="p-6">
         <h2 className="text-base font-semibold">Edit application</h2>
@@ -380,7 +375,7 @@ export function EditApplicationDialog({
           <button
             type="submit"
             disabled={updateApplication.isPending}
-            className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-on-solid transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {updateApplication.isPending ? 'Saving…' : 'Save changes'}
           </button>

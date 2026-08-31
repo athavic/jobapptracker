@@ -18,13 +18,13 @@ export function ErrorNotice({ error }: { error: unknown }) {
   return (
     <div
       role="alert"
-      className="rounded-md border border-red-200 bg-danger-soft px-4 py-3 text-sm text-red-900"
+      className="rounded-md border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-ink"
     >
       <p className="font-medium">{title}</p>
-      <p className="mt-0.5 text-red-800">{detail}</p>
+      <p className="mt-0.5 text-danger-ink">{detail}</p>
 
       {Object.keys(fieldErrors).length > 0 && (
-        <ul className="mt-2 list-inside list-disc space-y-0.5 text-red-800">
+        <ul className="mt-2 list-inside list-disc space-y-0.5 text-danger-ink">
           {Object.entries(fieldErrors).map(([field, message]) => (
             <li key={field}>
               <span className="font-mono text-xs">{field}</span> — {message}
