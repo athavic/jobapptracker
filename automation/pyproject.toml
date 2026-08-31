@@ -1,0 +1,34 @@
+[project]
+name = "jobtracker-automation"
+version = "0.1.0"
+description = "Job tracker automation worker - an API consumer, not a second database client"
+requires-python = ">=3.13"
+
+dependencies = [
+    "httpx>=0.28",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "respx>=0.22",
+]
+
+[project.scripts]
+jobtracker-automation = "jobtracker_automation.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# src layout: the package lives under src/ so that running pytest from this
+# directory cannot accidentally import it from the working directory. The tests
+# import what was installed, which is what the scheduler will run too.
+[tool.hatch.build.targets.wheel]
+packages = ["src/jobtracker_automation"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

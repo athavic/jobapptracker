@@ -7,7 +7,7 @@ A job application tracker with an automation dashboard. Four services, one sourc
 | Database | PostgreSQL 17 (Docker) | **phase 0 — working** |
 | `api/` | Spring Boot 3.5 · Java 17 | **phase 1 — working** |
 | `web/` | React 19 · TypeScript 5 · Vite 8 · Tailwind 4 | **phase 2 — working** |
-| `automation/` | Python 3.14 | not started (phase 3) |
+| `automation/` | Python 3.14 · httpx · pydantic | **phase 3 — working** |
 
 Architecture and full build plan: [Job Tracker Blueprint](https://claude.ai/code/artifact/e244d427-b199-4c28-83c6-b5f85d882342)
 
@@ -15,7 +15,8 @@ Architecture and full build plan: [Job Tracker Blueprint](https://claude.ai/code
 
 ## Before you start
 
-You need Docker Desktop **running**, Maven (which uses `JAVA_HOME`, currently JDK 17), and Node.
+You need Docker Desktop **running**, Maven (which uses `JAVA_HOME`, currently JDK 17),
+Node, and — for `automation/` — Python 3.13+.
 
 > **Port note:** this machine already runs a native PostgreSQL 18 Windows service on
 > **5432**. The Docker container therefore publishes **5433** on the host. If you ever see
@@ -64,6 +65,9 @@ cd web && npm run dev
 | `npm run dev:stop` | free ports 8080 and 5173 after a crash or a closed terminal |
 | `npm run dev:api` / `dev:web` | one server on its own |
 | `npm test` | the API test suite |
+| `npm run automation` | the `nudge_stale` job - reports, changes nothing |
+| `npm run automation:test` | the Python test suite |
+| `npm run automation:install` | create `automation/.venv` and install the worker |
 | `npm run build` | package the API and build the web bundle |
 | `npm run generate:api` | regenerate TypeScript types from the running API |
 | `npm run db:up` / `db:down` | start or stop Postgres |
@@ -101,8 +105,16 @@ their parent and keep holding the ports - so the next `npm run dev` fails with
 npm test
 ```
 
-Sixteen tests, no database needed: the lifecycle rules run as plain unit tests, and the
-controller runs as a `@WebMvcTest` slice with the service mocked.
+Twenty-one tests, no database needed: the lifecycle rules run as plain unit tests, and
+the controllers run as `@WebMvcTest` slices with the service mocked.
+
+```bash
+npm run automation:test
+```
+
+Thirty-one more on the Python side. The eight contract tests in that suite check the
+models against the live `/v3/api-docs` and skip themselves when the API is not running,
+so run them with `npm run dev:api` up after any backend change.
 
 ```bash
 npm run build
@@ -186,6 +198,10 @@ resources/db/migration/
 | `POST` | `/api/v1/applications/{id}/status` | the only way status changes |
 | `POST` | `/api/v1/applications/{id}/archive` | |
 | `DELETE` | `/api/v1/applications/{id}` | really deletes; prefer archive |
+| `GET` | `/api/v1/automation/runs` | `?jobName=&page=&size=` |
+| `GET` | `/api/v1/automation/runs/latest` | one row per job, for "last ran" |
+| `POST` | `/api/v1/automation/runs` | a job announcing it started |
+| `POST` | `/api/v1/automation/runs/{id}/complete` | its outcome; twice is a 409 |
 
 ### `web/` — the dashboard
 
@@ -223,11 +239,47 @@ web/src/
 
 ---
 
-## Next: phase 3
+### `automation/` — the Python workers
 
-The first Python worker. `automation/` gets a typed `httpx` client, pydantic models
-mirroring the DTOs, and the `nudge_stale` job — find applications with no movement in N
-days and flag them. No scraping yet; it is a pure API consumer, which is the point.
+```
+automation/src/jobtracker_automation/
+  config.py            pydantic-settings; CLI > env > .env > default
+  models.py            pydantic mirrors of the DTOs
+  client.py            httpx client, paging, ApiError
+  runs.py              the start/complete context manager
+  jobs/nudge_stale.py  the job; select_stale is a pure function
+  cli.py               argparse, logging, exit codes
+```
 
-That also needs `automation_run` (a new migration and endpoint) so jobs record their own
-executions and the dashboard can show when each last ran.
+`nudge_stale` finds applications that have been applied to, are still open, and have
+not moved in N days. Full detail in [automation/README.md](automation/README.md); the
+decisions worth carrying to the next job:
+
+- **Workers talk to the API, never to Postgres.** Direct SQL would be shorter and would
+  create a second place where the lifecycle is decided. One system of record is the
+  point of the seam.
+- **Python has no copy of the lifecycle either.** "Still open" means
+  `allowedNextStatuses` came back empty; before ghosting anything the job asks that same
+  field whether `GHOSTED` is legal. Same rule as the React dropdown, same single source.
+- **A run is recorded in two calls, not one.** Start before the work, complete after. A
+  job that is killed then leaves a visible `RUNNING` row instead of nothing — and
+  nothing is indistinguishable from never scheduled.
+- **Jobs read by default.** `updated_at` is the only staleness signal, so a job that
+  writes erases the staleness it was measuring. Writing takes `--apply`.
+- **Idempotency comes from the state machine.** Re-running the ghosting is safe because
+  `GHOSTED` is terminal, so the next scan filters those rows out. No "already processed"
+  flag to keep in sync.
+- **Hand-written models, checked against the live spec.** `tests/test_contract.py` reads
+  `/v3/api-docs` and fails if a field, a required marker, or an enum value has drifted.
+  It is the Python answer to what `generate:api` plus `tsc` does for the front end.
+
+---
+
+## Next: phase 4
+
+`application_event` — a row per status change, written inside the same transaction as
+the change itself. That is what makes the timeline real and answers the question the
+automation makes worth asking: *did I move this, or did a bot?*
+
+`ApplicationService.changeStatus` and `ChangeStatusRequest.note` are already shaped for
+it; the note is currently accepted and dropped.

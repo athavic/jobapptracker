@@ -13,6 +13,9 @@
     "db:reset": "docker compose down -v && docker compose up -d --wait",
     "db:psql": "docker exec -it jobtracker-postgres psql -U jobtracker -d jobtracker",
     "test": "mvn -f api/pom.xml test",
+    "automation": "cd automation && .venv\\Scripts\\python.exe -m jobtracker_automation nudge-stale",
+    "automation:test": "cd automation && .venv\\Scripts\\python.exe -m pytest",
+    "automation:install": "cd automation && py -m venv .venv && .venv\\Scripts\\python.exe -m pip install -e \".[dev]\"",
     "build": "mvn -f api/pom.xml package && npm --prefix web run build",
     "generate:api": "npm --prefix web run generate:api"
   },
