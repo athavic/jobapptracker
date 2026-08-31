@@ -134,12 +134,20 @@ export function EditApplicationDialog({
     )
   }
 
+  /*
+   * The backdrop is a light scrim plus a blur, not a heavy wash. 40% black over a
+   * near-white page flattens to solid grey and hides the board behind it. Blurring
+   * separates the two layers instead, so the dialog reads as sitting *on top of*
+   * the list rather than replacing it, and the row you clicked stays recognisable.
+   */
+  const backdrop = 'backdrop:bg-ink/20 backdrop:backdrop-blur-xs'
+
   return (
     <dialog
       ref={dialogRef}
       onKeyDown={handleKeyDown}
       onClick={handleBackdropClick}
-      className="m-auto w-full max-w-xl rounded-lg border border-line bg-surface p-0 text-ink backdrop:bg-black/40"
+      className={`m-auto w-full max-w-xl rounded-lg border border-line bg-surface p-0 text-ink ${backdrop}`}
     >
       <form onSubmit={handleSubmit} className="p-6">
         <h2 className="text-base font-semibold">Edit application</h2>
