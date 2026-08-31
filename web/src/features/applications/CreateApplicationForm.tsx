@@ -45,6 +45,7 @@ const toNumber = (value: string) => (value.trim() === '' ? undefined : Number(va
 
 export function CreateApplicationForm() {
   const [form, setForm] = useState<FormState>(EMPTY)
+  const [isExpanded, setIsExpanded] = useState(true)
   const createApplication = useCreateApplication()
   const hasSalary = form.salaryMode !== 'NONE'
   const amountStep = form.salaryPeriod === 'HOURLY' ? '0.01' : '1'
@@ -88,12 +89,42 @@ export function CreateApplicationForm() {
       onSubmit={handleSubmit}
       className="rounded-lg border border-line bg-surface p-5 shadow-sm"
     >
-      <h2 className="text-sm font-semibold text-ink">Track a new application</h2>
-      <p className="mt-1 text-xs text-ink-soft">
-        The company is created automatically if it does not exist yet.
-      </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-sm font-semibold text-ink">Track a new application</h2>
+          {isExpanded && (
+            <p className="mt-1 text-xs text-ink-soft">
+              The company is created automatically if it does not exist yet.
+            </p>
+          )}
+        </div>
 
-      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <button
+          type="button"
+          onClick={() => setIsExpanded((current) => !current)}
+          aria-expanded={isExpanded}
+          aria-controls="create-application-fields"
+          aria-label={isExpanded ? 'Hide add application form' : 'Show add application form'}
+          className="shrink-0 rounded-md border border-line p-2 text-ink-soft transition hover:border-brand hover:text-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={`size-4 transition-transform ${isExpanded ? '' : 'rotate-180'}`}
+          >
+            <path d="m18 15-6-6-6 6" />
+          </svg>
+        </button>
+      </div>
+
+      {isExpanded && (
+        <div id="create-application-fields">
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <div>
           <label className={labelClass} htmlFor="companyName">
             Company
@@ -277,27 +308,29 @@ export function CreateApplicationForm() {
             </div>
           )}
         </fieldset>
-      </div>
+          </div>
 
-      {createApplication.isError && (
-        <div className="mt-4">
-          <ErrorNotice error={createApplication.error} />
+          {createApplication.isError && (
+            <div className="mt-4">
+              <ErrorNotice error={createApplication.error} />
+            </div>
+          )}
+
+          <div className="mt-4 flex items-center gap-3">
+            <button
+              type="submit"
+              disabled={createApplication.isPending}
+              className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {createApplication.isPending ? 'Saving…' : 'Add application'}
+            </button>
+
+            {createApplication.isSuccess && (
+              <span className="text-xs text-emerald-700">Added.</span>
+            )}
+          </div>
         </div>
       )}
-
-      <div className="mt-4 flex items-center gap-3">
-        <button
-          type="submit"
-          disabled={createApplication.isPending}
-          className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {createApplication.isPending ? 'Saving…' : 'Add application'}
-        </button>
-
-        {createApplication.isSuccess && (
-          <span className="text-xs text-emerald-700">Added.</span>
-        )}
-      </div>
     </form>
   )
 }
