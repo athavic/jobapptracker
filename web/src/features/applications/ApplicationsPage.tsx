@@ -1,24 +1,10 @@
 import { useState } from 'react'
-import type { ApplicationStatus } from '../../api/client'
 import { ErrorNotice } from '../../components/ErrorNotice'
 import { ThemeToggle } from '../../components/ThemeToggle'
-import { titleCase } from '../../lib/format'
 import { ApplicationsTable } from './ApplicationsTable'
 import { CreateApplicationForm } from './CreateApplicationForm'
+import { StatusFilter } from './StatusFilter'
 import { useApplications, type ApplicationFilters } from './hooks'
-
-const STATUSES: ApplicationStatus[] = [
-  'DISCOVERED',
-  'SAVED',
-  'APPLIED',
-  'SCREEN',
-  'INTERVIEW',
-  'OFFER',
-  'ACCEPTED',
-  'REJECTED',
-  'GHOSTED',
-  'WITHDRAWN',
-]
 
 export function ApplicationsPage() {
   const [filters, setFilters] = useState<ApplicationFilters>({ page: 0, size: 20 })
@@ -48,27 +34,11 @@ export function ApplicationsPage() {
 
       <div className="mb-4 flex flex-wrap items-end gap-3">
         <div>
-          <label
-            className="mb-1 block text-xs font-medium text-ink-soft"
-            htmlFor="filter-status"
-          >
-            Status
-          </label>
-          <select
-            id="filter-status"
-            value={filters.status ?? ''}
-            onChange={(e) =>
-              updateFilter({ status: (e.target.value || undefined) as ApplicationStatus })
-            }
-            className="rounded-md border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
-          >
-            <option value="">All</option>
-            {STATUSES.map((status) => (
-              <option key={status} value={status}>
-                {titleCase(status)}
-              </option>
-            ))}
-          </select>
+          <span className="mb-1 block text-xs font-medium text-ink-soft">Status</span>
+          <StatusFilter
+            selected={filters.statuses ?? []}
+            onChange={(statuses) => updateFilter({ statuses })}
+          />
         </div>
 
         <div className="grow sm:grow-0">

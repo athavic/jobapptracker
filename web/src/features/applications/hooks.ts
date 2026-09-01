@@ -8,7 +8,12 @@ import {
 } from '../../api/client'
 
 export interface ApplicationFilters {
-  status?: ApplicationStatus
+  /**
+   * Empty means "every status", matching the API: an absent filter and an
+   * empty one are the same request. Kept in lifecycle order by StatusFilter so
+   * the query key below stays stable regardless of the order you ticked boxes.
+   */
+  statuses?: ApplicationStatus[]
   company?: string
   includeArchived?: boolean
   page?: number
@@ -36,7 +41,11 @@ export function useApplications(filters: ApplicationFilters) {
         api.GET('/api/v1/applications', {
           params: {
             query: {
-              status: filters.status,
+              // openapi-fetch serialises an array as repeated params -
+              // ?status=APPLIED&status=SCREEN - which is exactly what Spring
+              // binds a List<ApplicationStatus> from. Undefined when empty so
+              // the request carries no status key at all.
+              status: filters.statuses?.length ? filters.statuses : undefined,
               company: filters.company || undefined,
               includeArchived: filters.includeArchived,
               page: filters.page ?? 0,

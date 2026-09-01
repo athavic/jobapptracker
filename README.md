@@ -201,7 +201,7 @@ resources/db/migration/
 
 | | Path | |
 |---|---|---|
-| `GET` | `/api/v1/applications` | `?status=&company=&includeArchived=&page=&size=&sort=` |
+| `GET` | `/api/v1/applications` | `?status=&company=&includeArchived=&page=&size=&sort=` — `status` repeats: `?status=APPLIED&status=SCREEN` |
 | `POST` | `/api/v1/applications` | 201 + `Location` header |
 | `GET` | `/api/v1/applications/{id}` | |
 | `PATCH` | `/api/v1/applications/{id}` | null fields mean "leave alone" |

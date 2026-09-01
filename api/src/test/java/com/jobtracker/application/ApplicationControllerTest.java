@@ -2,11 +2,13 @@ package com.jobtracker.application;
 
 import com.jobtracker.application.dto.ApplicationEventResponse;
 import com.jobtracker.application.dto.ApplicationResponse;
+import com.jobtracker.application.dto.PageResponse;
 import com.jobtracker.application.dto.CompanySummary;
 import com.jobtracker.common.Actor;
 import com.jobtracker.common.InvalidStatusTransitionException;
 import com.jobtracker.common.NotFoundException;
 import org.junit.jupiter.api.DisplayName;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -18,10 +20,13 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -205,6 +210,59 @@ class ApplicationControllerTest {
 
         mockMvc.perform(get("/api/v1/applications/999/events"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("the status filter accepts several values and passes all of them down")
+    void listAcceptsSeveralStatuses() throws Exception {
+        given(service.search(any(), any(), anyBoolean(), any())).willReturn(emptyPage());
+
+        mockMvc.perform(get("/api/v1/applications")
+                        .param("status", "APPLIED")
+                        .param("status", "SCREEN"))
+                .andExpect(status().isOk());
+
+        assertThat(capturedStatuses())
+                .containsExactly(ApplicationStatus.APPLIED, ApplicationStatus.SCREEN);
+    }
+
+    @Test
+    @DisplayName("one status still works - the single-value callers did not have to change")
+    void listStillAcceptsASingleStatus() throws Exception {
+        given(service.search(any(), any(), anyBoolean(), any())).willReturn(emptyPage());
+
+        mockMvc.perform(get("/api/v1/applications").param("status", "APPLIED"))
+                .andExpect(status().isOk());
+
+        assertThat(capturedStatuses()).containsExactly(ApplicationStatus.APPLIED);
+    }
+
+    @Test
+    @DisplayName("no status at all arrives as null, not as an empty list")
+    void listWithNoStatusFiltersNothing() throws Exception {
+        given(service.search(any(), any(), anyBoolean(), any())).willReturn(emptyPage());
+
+        mockMvc.perform(get("/api/v1/applications")).andExpect(status().isOk());
+
+        assertThat(capturedStatuses()).isNull();
+    }
+
+    @Test
+    @DisplayName("an unknown status is a 400, not silently ignored")
+    void listRejectsAnUnknownStatus() throws Exception {
+        mockMvc.perform(get("/api/v1/applications").param("status", "PENDING"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<ApplicationStatus> capturedStatuses() {
+        ArgumentCaptor<List<ApplicationStatus>> captor = ArgumentCaptor.forClass(List.class);
+        verify(service).search(captor.capture(), any(), anyBoolean(), any());
+        return captor.getValue();
+    }
+
+    private static PageResponse<ApplicationResponse> emptyPage() {
+        return new PageResponse<>(List.of(), 0, 20, 0, 0, true, true);
     }
 
     private static ApplicationResponse sampleResponse() {
