@@ -136,3 +136,52 @@ export function useArchiveApplication() {
     },
   })
 }
+
+/**
+ * Puts an archived application back on the board.
+ *
+ * There is no `/unarchive` endpoint to call - PATCH already accepts
+ * `archived: false`, and every other field left out means "leave alone", so
+ * this body says exactly one thing.
+ *
+ * Note what it does NOT do: un-archiving writes no event, because
+ * ApplicationEventType has no value for it. That is a deliberate gap on the
+ * server side rather than something missing here - see
+ * ApplicationService.setArchived. The timeline will show an Archived line with
+ * no matching Restored line, and that is expected.
+ */
+export function useRestoreApplication() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: number) =>
+      unwrap(
+        api.PATCH('/api/v1/applications/{id}', {
+          params: { path: { id } },
+          body: { archived: false },
+        }),
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: applicationKeys.all })
+    },
+  })
+}
+
+/**
+ * Really deletes. Archive is the one you almost always want.
+ *
+ * The row's events go with it - application_event has ON DELETE CASCADE - so
+ * this removes the history too, and with it whatever the row contributed to the
+ * funnel stats. That is why it sits behind a confirmation and archive does not.
+ */
+export function useDeleteApplication() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: number) =>
+      unwrap(api.DELETE('/api/v1/applications/{id}', { params: { path: { id } } })),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: applicationKeys.all })
+    },
+  })
+}
