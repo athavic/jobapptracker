@@ -157,7 +157,7 @@ automation/
   tests/
 ```
 
-Two details in `client.py` worth knowing before writing a second job:
+Three details in `client.py` worth knowing before writing a second job:
 
 - **Retries cover connection errors only.** If the connection never opened,
   nothing can have happened twice. Retrying a 5xx is a different promise: a POST
@@ -166,6 +166,13 @@ Two details in `client.py` worth knowing before writing a second job:
 - **Paging is pinned to `sort=id,asc`.** The API's default sort is `createdAt`,
   and any job that writes moves `updatedAt`; paging over a mutable ordering can
   show a row twice or skip one entirely as rows shift between pages.
+- **Every request carries `X-Actor: AUTOMATION`, plus the job name.** It is set
+  once on the httpx session, not per call, so a new endpoint on the client cannot
+  forget it. Without the header the API records the job's writes as a person's,
+  and an application this worker ghosted becomes indistinguishable from one you
+  ghosted yourself — which is the question `application_event` exists to answer.
+  Pass `job_name=` when constructing the client; a job that forgets loses the
+  name but is still recorded as a bot.
 
 ## Next
 

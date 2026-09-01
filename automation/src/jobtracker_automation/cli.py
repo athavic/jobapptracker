@@ -116,7 +116,7 @@ def _dispatch(
     if args.command != NUDGE_STALE.replace("_", "-"):
         raise AssertionError(f"unhandled command {args.command!r}")
 
-    with JobTrackerClient(settings) as client:
+    with JobTrackerClient(settings, job_name=NUDGE_STALE) as client:
         with record_run(
             client, NUDGE_STALE, trigger=trigger, enabled=not args.no_record
         ) as outcome:

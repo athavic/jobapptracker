@@ -92,3 +92,43 @@ def test_an_unparseable_error_body_still_raises(settings):
 
     assert caught.value.status_code == 502
     assert caught.value.problem is None
+
+
+@respx.mock
+def test_every_request_identifies_the_worker_as_a_bot(settings):
+    """The header is the whole reason the events table can tell us apart.
+
+    Asserted on a read as well as a write: it is set once on the session, so a
+    future endpoint added to this client cannot forget it.
+    """
+    respx.get(f"{BASE}/api/v1/applications").mock(
+        return_value=httpx.Response(200, json=page_json([application_json(1)], page=0, size=2, total=1))
+    )
+    route = respx.post(f"{BASE}/api/v1/applications/1/status").mock(
+        return_value=httpx.Response(200, json=application_json(1, status="GHOSTED"))
+    )
+
+    with JobTrackerClient(settings, job_name="nudge_stale") as client:
+        list(client.iter_applications())
+        client.change_status(1, ApplicationStatus.GHOSTED, note="no reply")
+
+    for call in respx.calls:
+        assert call.request.headers["X-Actor"] == "AUTOMATION"
+        assert call.request.headers["X-Actor-Detail"] == "nudge_stale"
+
+    assert route.call_count == 1
+
+
+@respx.mock
+def test_a_client_with_no_job_name_still_admits_to_being_a_bot(settings):
+    """Forgetting the name costs detail, never the distinction that matters."""
+    respx.get(f"{BASE}/api/v1/applications/1").mock(
+        return_value=httpx.Response(200, json=application_json(1))
+    )
+
+    with JobTrackerClient(settings) as client:
+        client.get_application(1)
+
+    request = respx.calls[0].request
+    assert request.headers["X-Actor"] == "AUTOMATION"
+    assert "X-Actor-Detail" not in request.headers

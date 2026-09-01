@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Application, ApplicationStatus } from '../../api/client'
 import { formatRelative, formatSalary, titleCase } from '../../lib/format'
+import { ApplicationTimelineDialog } from './ApplicationTimeline'
 import { EditApplicationDialog } from './EditApplicationDialog'
 import { StatusBadge } from './StatusBadge'
 import { useChangeStatus } from './hooks'
@@ -102,6 +103,9 @@ export function ApplicationsTable({ applications }: { applications: Application[
   const [editingId, setEditingId] = useState<number | null>(null)
   const editing = applications.find((application) => application.id === editingId) ?? null
 
+  const [historyId, setHistoryId] = useState<number | null>(null)
+  const history = applications.find((application) => application.id === historyId) ?? null
+
   if (applications.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-line bg-surface px-6 py-12 text-center">
@@ -162,6 +166,14 @@ export function ApplicationsTable({ applications }: { applications: Application[
                   <StatusControl application={application} />
                   <button
                     type="button"
+                    onClick={() => setHistoryId(application.id)}
+                    className="rounded-md border border-line px-2 py-1 text-xs text-ink-soft transition hover:border-brand hover:text-brand"
+                  >
+                    History
+                    <span className="sr-only"> for {application.roleTitle}</span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setEditingId(application.id)}
                     className="rounded-md border border-line px-2 py-1 text-xs text-ink-soft transition hover:border-brand hover:text-brand"
                   >
@@ -174,6 +186,14 @@ export function ApplicationsTable({ applications }: { applications: Application[
           ))}
         </tbody>
       </table>
+
+      {history && (
+        <ApplicationTimelineDialog
+          key={history.id}
+          application={history}
+          onClose={() => setHistoryId(null)}
+        />
+      )}
 
       {editing && (
         <EditApplicationDialog

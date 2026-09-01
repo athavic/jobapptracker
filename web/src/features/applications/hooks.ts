@@ -25,6 +25,7 @@ export const applicationKeys = {
   all: ['applications'] as const,
   lists: () => [...applicationKeys.all, 'list'] as const,
   list: (filters: ApplicationFilters) => [...applicationKeys.lists(), filters] as const,
+  events: (id: number) => [...applicationKeys.all, 'events', id] as const,
 }
 
 export function useApplications(filters: ApplicationFilters) {
@@ -48,6 +49,31 @@ export function useApplications(filters: ApplicationFilters) {
     // Keeps the previous page on screen while the next one loads, instead of
     // flashing an empty table on every filter change.
     placeholderData: (previous) => previous,
+  })
+}
+
+/**
+ * One application's history.
+ *
+ * Sitting under `applicationKeys.all` is what makes this correct for free: the
+ * mutations below already invalidate that key, so changing a status refetches
+ * the timeline without any of them naming it. A separate top-level key would
+ * work until the day someone added a mutation and forgot the second invalidate.
+ *
+ * `enabled` keeps it from firing until a row is actually open - the dialog is
+ * the only caller, and fetching a timeline nobody asked to see would be one
+ * request per row on screen.
+ */
+export function useApplicationEvents(id: number | null) {
+  return useQuery({
+    queryKey: applicationKeys.events(id ?? 0),
+    queryFn: () =>
+      unwrap(
+        api.GET('/api/v1/applications/{id}/events', {
+          params: { path: { id: id as number } },
+        }),
+      ),
+    enabled: id != null,
   })
 }
 
