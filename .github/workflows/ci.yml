@@ -1,0 +1,151 @@
+# Runs on every push and every pull request. Four jobs, and the first three run
+# at the same time on separate machines - the whole point of splitting them is
+# that a TypeScript error and a Java error both show up in the same run, instead
+# of the first failure hiding the second.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A second push to the same branch cancels the run still in flight. Without
+# this you queue runs for commits nobody is looking at any more.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: API (Java 17)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: temurin
+          # Caches ~/.m2 keyed on pom.xml. Saves ~40s a run.
+          cache: maven
+
+      # The API tests are @WebMvcTest slices and plain unit tests - no database,
+      # so no service container needed here.
+      - run: mvn -B -f api/pom.xml verify
+
+  web:
+    name: Web (TypeScript)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # ci, not install: it installs exactly the lockfile and fails if
+      # package.json and the lock disagree. Never let CI silently resolve
+      # a different dependency tree than your machine.
+      - run: npm ci
+        working-directory: web
+
+      - run: npm run lint
+        working-directory: web
+
+      # build runs `tsc -b` first, so this is the typecheck too.
+      - run: npm run build
+        working-directory: web
+
+  automation:
+    name: Automation (Python)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+
+      - run: pip install -e ".[dev]"
+        working-directory: automation
+
+      # The eight contract tests skip themselves here - no API is running.
+      # The `contract` job below is where they actually run.
+      - run: pytest
+        working-directory: automation
+
+  contract:
+    name: Contract (Python models vs live API)
+    runs-on: ubuntu-latest
+
+    # A real Postgres, managed by the runner, on 5432. Same image as
+    # docker-compose.yml so a schema problem here is a real one.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: jobtracker
+          POSTGRES_USER: jobtracker
+          POSTGRES_PASSWORD: jobtracker
+        ports:
+          - 5432:5432
+        # The job does not start until this passes - the CI equivalent of
+        # `docker compose up --wait`. Flyway does not retry its connection.
+        options: >-
+          --health-cmd "pg_isready -U jobtracker"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DB_HOST: localhost
+      DB_PORT: 5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: temurin
+          cache: maven
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+
+      # -DskipTests: the `api` job already ran them. This job only needs a jar.
+      - run: mvn -B -f api/pom.xml package -DskipTests
+
+      - name: Start the API
+        run: |
+          java -jar api/target/jobtracker-api-0.1.0-SNAPSHOT.jar > api.log 2>&1 &
+          echo $! > api.pid
+
+      # Poll the endpoint the tests actually read. Flyway has to migrate an
+      # empty database first, so this takes a few seconds.
+      - name: Wait for /v3/api-docs
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:8080/v3/api-docs > /dev/null; then
+              echo "API is up after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "API never came up:"; cat api.log; exit 1
+
+      - run: pip install -e ".[dev]"
+        working-directory: automation
+
+      - run: pytest tests/test_contract.py
+        working-directory: automation
+
+      # if: always() - when the tests fail, the API log is the thing you want
+      # to read, and a failed step stops the job by default.
+      - name: API log
+        if: always()
+        run: cat api.log
