@@ -1,6 +1,11 @@
-# Job Application Tracker
+# Pendency
 
 A job application tracker with an automation dashboard. Four services, one source of truth.
+
+> **pendency** *(n.)* — the state of being pending. It is the state most of your
+> applications are in most of the time, and the one this app exists to make visible.
+
+Domain: `pendency.app` (`.com` was being resold for $9,999; `.app` was not).
 
 | Piece | Stack | Status |
 |---|---|---|
@@ -10,7 +15,7 @@ A job application tracker with an automation dashboard. Four services, one sourc
 | `automation/` | Python 3.14 · httpx · pydantic | **phase 3 — working** |
 | History | `application_event` across all three | **phase 4 — working** |
 
-Architecture and full build plan: [Job Tracker Blueprint](https://claude.ai/code/artifact/e244d427-b199-4c28-83c6-b5f85d882342)
+Architecture and full build plan: [Pendency Blueprint](https://claude.ai/code/artifact/e244d427-b199-4c28-83c6-b5f85d882342)
 
 ---
 
