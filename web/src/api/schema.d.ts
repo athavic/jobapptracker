@@ -132,6 +132,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/applications/{id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["events"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -287,6 +303,22 @@ export interface components {
             totalPages: number;
             first: boolean;
             last: boolean;
+        };
+        ApplicationEventResponse: {
+            /** Format: int64 */
+            id: number;
+            /** @enum {string} */
+            type: "CREATED" | "STATUS_CHANGED" | "ARCHIVED";
+            /** @enum {string} */
+            fromStatus?: "DISCOVERED" | "SAVED" | "APPLIED" | "SCREEN" | "INTERVIEW" | "OFFER" | "ACCEPTED" | "REJECTED" | "GHOSTED" | "WITHDRAWN";
+            /** @enum {string} */
+            toStatus?: "DISCOVERED" | "SAVED" | "APPLIED" | "SCREEN" | "INTERVIEW" | "OFFER" | "ACCEPTED" | "REJECTED" | "GHOSTED" | "WITHDRAWN";
+            /** @enum {string} */
+            actor: "HUMAN" | "AUTOMATION" | "SYSTEM";
+            actorDetail?: string;
+            note?: string;
+            /** Format: date-time */
+            occurredAt: string;
         };
     };
     responses: never;
@@ -581,6 +613,28 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["AutomationRunResponse"][];
+                };
+            };
+        };
+    };
+    events: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ApplicationEventResponse"][];
                 };
             };
         };

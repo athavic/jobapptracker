@@ -15,6 +15,21 @@ export function formatDate(iso: string | undefined): string {
   return dateFormat.format(new Date(iso))
 }
 
+const dateTimeFormat = new Intl.DateTimeFormat(undefined, {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+})
+
+/**
+ * Used for event timestamps, where the relative form is not enough on its own:
+ * two events "2 days ago" may be minutes or hours apart, and the order only
+ * makes sense if you can see which.
+ */
+export function formatDateTime(iso: string | undefined): string {
+  if (!iso) return '—'
+  return dateTimeFormat.format(new Date(iso))
+}
+
 export function formatRelative(iso: string | undefined): string {
   if (!iso) return '—'
   const days = Math.round((Date.now() - new Date(iso).getTime()) / 86_400_000)
