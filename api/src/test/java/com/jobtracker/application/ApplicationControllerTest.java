@@ -25,8 +25,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -263,6 +265,39 @@ class ApplicationControllerTest {
 
     private static PageResponse<ApplicationResponse> emptyPage() {
         return new PageResponse<>(List.of(), 0, 20, 0, 0, true, true);
+    }
+
+    @DisplayName("archiving returns 204 and no body")
+    void archiveReturnsNoContent() throws Exception {
+        mockMvc.perform(post("/api/v1/applications/1/archive"))
+                .andExpect(status().isNoContent());
+
+        then(service).should().archive(1L);
+    }
+
+    @Test
+    @DisplayName("deleting returns 204")
+    void deleteReturnsNoContent() throws Exception {
+        mockMvc.perform(delete("/api/v1/applications/1"))
+                .andExpect(status().isNoContent());
+
+        then(service).should().delete(1L);
+    }
+
+    /**
+     * The UI deletes from a confirmation dialog that was opened against a row it
+     * had already loaded, so the interesting case is the row disappearing in
+     * between - another tab, or an automation job. That has to arrive as a 404
+     * the dialog can show, not a 500.
+     */
+    @Test
+    @DisplayName("deleting an id that is already gone returns 404, not 500")
+    void deleteUnknownIdReturnsNotFound() throws Exception {
+        willThrow(new NotFoundException("Application", 999L)).given(service).delete(999L);
+
+        mockMvc.perform(delete("/api/v1/applications/999"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("Application 999 not found"));
     }
 
     private static ApplicationResponse sampleResponse() {
