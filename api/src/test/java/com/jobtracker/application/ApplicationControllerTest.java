@@ -1,7 +1,9 @@
 package com.jobtracker.application;
 
+import com.jobtracker.application.dto.ApplicationEventResponse;
 import com.jobtracker.application.dto.ApplicationResponse;
 import com.jobtracker.application.dto.CompanySummary;
+import com.jobtracker.common.Actor;
 import com.jobtracker.common.InvalidStatusTransitionException;
 import com.jobtracker.common.NotFoundException;
 import org.junit.jupiter.api.DisplayName;
@@ -13,6 +15,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Set;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -171,6 +174,37 @@ class ApplicationControllerTest {
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors.salaryMin").exists());
+    }
+
+    @Test
+    @DisplayName("the timeline serialises both statuses and the job that made the change")
+    void eventsAreReturnedAsATimeline() throws Exception {
+        given(service.events(1L)).willReturn(List.of(new ApplicationEventResponse(
+                9L,
+                ApplicationEventType.STATUS_CHANGED,
+                ApplicationStatus.APPLIED,
+                ApplicationStatus.GHOSTED,
+                Actor.AUTOMATION,
+                "nudge_stale",
+                "no reply in 30 days",
+                Instant.parse("2026-08-30T10:00:00Z"))));
+
+        mockMvc.perform(get("/api/v1/applications/1/events"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].type").value("STATUS_CHANGED"))
+                .andExpect(jsonPath("$[0].fromStatus").value("APPLIED"))
+                .andExpect(jsonPath("$[0].toStatus").value("GHOSTED"))
+                .andExpect(jsonPath("$[0].actor").value("AUTOMATION"))
+                .andExpect(jsonPath("$[0].actorDetail").value("nudge_stale"));
+    }
+
+    @Test
+    @DisplayName("the timeline of an unknown application is a 404, not an empty list")
+    void eventsForUnknownIdReturnNotFound() throws Exception {
+        given(service.events(999L)).willThrow(new NotFoundException("Application", 999L));
+
+        mockMvc.perform(get("/api/v1/applications/999/events"))
+                .andExpect(status().isNotFound());
     }
 
     private static ApplicationResponse sampleResponse() {

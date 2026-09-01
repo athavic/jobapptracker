@@ -1,5 +1,6 @@
 package com.jobtracker.application;
 
+import com.jobtracker.application.dto.ApplicationEventResponse;
 import com.jobtracker.application.dto.ApplicationResponse;
 import com.jobtracker.application.dto.ChangeStatusRequest;
 import com.jobtracker.application.dto.CreateApplicationRequest;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
+import java.util.List;
 
 /**
  * The HTTP edge. Deliberately thin: routing, status codes, and validation only.
@@ -88,6 +90,15 @@ public class ApplicationController {
     public ApplicationResponse changeStatus(@PathVariable Long id,
                                             @Valid @RequestBody ChangeStatusRequest request) {
         return service.changeStatus(id, request);
+    }
+
+    /**
+     * The timeline. A plain list rather than a page: an application accumulates
+     * events at human speed, so paging would be ceremony around a dozen rows.
+     */
+    @GetMapping("/{id}/events")
+    public List<ApplicationEventResponse> events(@PathVariable Long id) {
+        return service.events(id);
     }
 
     @PostMapping("/{id}/archive")
