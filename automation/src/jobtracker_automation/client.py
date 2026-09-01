@@ -76,7 +76,13 @@ class JobTrackerClient:
     and a second set of failure modes to reason about.
     """
 
-    def __init__(self, settings: Settings, client: httpx.Client | None = None) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        client: httpx.Client | None = None,
+        *,
+        job_name: str | None = None,
+    ) -> None:
         self._settings = settings
         self._owns_client = client is None
         self._http = client or httpx.Client(
@@ -91,6 +97,20 @@ class JobTrackerClient:
             # the next scheduled run picks it up.
             transport=httpx.HTTPTransport(retries=2),
         )
+
+        # Every write this client makes is stamped as a bot, and named.
+        #
+        # Without this the API sees no X-Actor and records the job's writes as
+        # HUMAN - and an application this worker ghosted would be indistinguishable
+        # from one you ghosted yourself, which is the exact question the events
+        # table was added to answer. Set on the session rather than per call so a
+        # new endpoint cannot be added without it.
+        #
+        # Applied to an injected client too: a test that passes its own
+        # httpx.Client should exercise the same headers production sends.
+        self._http.headers["X-Actor"] = "AUTOMATION"
+        if job_name:
+            self._http.headers["X-Actor-Detail"] = job_name
 
     def __enter__(self) -> Self:
         return self

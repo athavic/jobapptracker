@@ -127,3 +127,22 @@ def test_enums_match_exactly(openapi, enum, schema_name, property_name):
     published = set(schema(openapi, schema_name)["properties"][property_name]["enum"])
     mirrored = {member.value for member in enum}
     assert published == mirrored
+
+
+def test_automation_is_still_a_valid_actor(openapi):
+    """The client hard-codes the X-Actor value it sends.
+
+    The header itself is not in the OpenAPI document - it is read outside the
+    controller signature - but the enum behind it is, via the event DTO. So this
+    is the one place the hard-coded string can be checked against the server.
+    Rename Actor.AUTOMATION in Java and every write the worker makes starts
+    coming back 400; this fails first, and says why.
+    """
+    actor = schema(openapi, "ApplicationEventResponse")["properties"]["actor"]
+    assert "AUTOMATION" in actor["enum"]
+
+
+def test_the_event_dto_still_marks_actor_and_type_as_required(openapi):
+    """The two fields the timeline cannot render without."""
+    required = set(schema(openapi, "ApplicationEventResponse").get("required", []))
+    assert {"id", "type", "actor", "occurredAt"} <= required
