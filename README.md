@@ -8,6 +8,7 @@ A job application tracker with an automation dashboard. Four services, one sourc
 | `api/` | Spring Boot 3.5 · Java 17 | **phase 1 — working** |
 | `web/` | React 19 · TypeScript 5 · Vite 8 · Tailwind 4 | **phase 2 — working** |
 | `automation/` | Python 3.14 · httpx · pydantic | **phase 3 — working** |
+| History | `application_event` across all three | **phase 4 — working** |
 
 Architecture and full build plan: [Job Tracker Blueprint](https://claude.ai/code/artifact/e244d427-b199-4c28-83c6-b5f85d882342)
 
@@ -105,14 +106,14 @@ their parent and keep holding the ports - so the next `npm run dev` fails with
 npm test
 ```
 
-Twenty-one tests, no database needed: the lifecycle rules run as plain unit tests, and
+Thirty-three tests, no database needed: the lifecycle rules run as plain unit tests, and
 the controllers run as `@WebMvcTest` slices with the service mocked.
 
 ```bash
 npm run automation:test
 ```
 
-Thirty-one more on the Python side. The eight contract tests in that suite check the
+Thirty-five more on the Python side. The ten contract tests in that suite check the
 models against the live `/v3/api-docs` and skip themselves when the API is not running,
 so run them with `npm run dev:api` up after any backend change.
 
@@ -185,8 +186,12 @@ com/jobtracker/
   common/
     GlobalExceptionHandler.java     every error as an RFC 9457 problem detail
     WebConfig.java                  CORS for the Vite dev server
+  common/
+    Actor.java                      HUMAN / AUTOMATION / SYSTEM
+    ActorContext.java               who is calling, without the service knowing HTTP
 resources/db/migration/
   V1__initial_schema.sql            company + job_application
+  V4__application_event.sql         the history, plus a backfill
 ```
 
 | | Path | |
@@ -198,6 +203,7 @@ resources/db/migration/
 | `POST` | `/api/v1/applications/{id}/status` | the only way status changes |
 | `POST` | `/api/v1/applications/{id}/archive` | |
 | `DELETE` | `/api/v1/applications/{id}` | really deletes; prefer archive |
+| `GET` | `/api/v1/applications/{id}/events` | the timeline, newest first |
 | `GET` | `/api/v1/automation/runs` | `?jobName=&page=&size=` |
 | `GET` | `/api/v1/automation/runs/latest` | one row per job, for "last ran" |
 | `POST` | `/api/v1/automation/runs` | a job announcing it started |
@@ -213,6 +219,7 @@ web/src/
   features/applications/
     ApplicationsPage.tsx    filters + paging
     ApplicationsTable.tsx   rows + the status control
+    ApplicationTimeline.tsx the history dialog
     CreateApplicationForm.tsx
     StatusBadge.tsx
     hooks.ts                queries, mutations, query keys
@@ -236,6 +243,18 @@ web/src/
   `allowedNextStatuses`, which the server computes from the same enum it enforces. The
   rules cannot drift because they exist once.
 - **Mutations invalidate, they do not patch the cache.** Simpler, and always correct.
+- **History is written in the same transaction as the change.** `application_event`
+  rows are saved inside `changeStatus`, not after it, so there is no window where the
+  status moved but the history did not. A history with gaps is worse than none, because
+  it looks complete.
+- **Who did it comes from an `X-Actor` header, behind `ActorContext`.** The service
+  records an actor without knowing HTTP exists, which is what lets phase 5 swap in an
+  authenticated principal without touching a service method. An unrecognised value is a
+  400 rather than a quiet fall back to `HUMAN` - misattributing a bot's write to a
+  person would corrupt the one column nobody would think to double-check. It trusts the
+  caller completely, which is only acceptable while there is nothing to protect.
+- **The timeline is read-only.** An editable history answers "what do we currently claim
+  happened", which is the question `job_application` already answers.
 
 ---
 
@@ -275,18 +294,30 @@ decisions worth carrying to the next job:
 
 ---
 
-## Next: phase 4
+## Next: phase 5 — multi-user
 
-`application_event` — a row per status change, written inside the same transaction as
-the change itself. That is what makes the timeline real and answers the question the
-automation makes worth asking: *did I move this, or did a bot?*
+Workspaces, Google sign-in, scoped queries and row-level security. It sits here
+rather than at the end because `job_posting` and the Gmail job both get harder to
+retrofit, and because phase 4's events table is what makes a shared workspace
+legible: once two people can move the same application, "who moved this" stops
+being a curiosity and becomes the only way to read the board.
 
-`ApplicationService.changeStatus` and `ChangeStatusRequest.note` are already shaped for
-it; the note is currently accepted and dropped.
+That phase is also where `X-Actor` has to go. A self-declared identity is a
+convenience today and a privilege-escalation bug the moment there is a real
+principal to impersonate; `ActorContext` exists so that replacement is one class.
 
-Phase 5 is now **multi-user** — workspaces, Google sign-in, scoped queries and row-level
-security — which moves the scraper to 6, Gmail ingestion to 7 and deployment to 8. It sits
-there rather than at the end because `job_posting` and the Gmail job both get harder to
-retrofit, and because phase 4's events table is what makes a shared workspace legible.
-Sections 12 and 13 of the [blueprint](https://claude.ai/code/artifact/e244d427-b199-4c28-83c6-b5f85d882342)
+Then the scraper at 6, Gmail ingestion at 7 and deployment at 8. Sections 12 and 13
+of the [blueprint](https://claude.ai/code/artifact/e244d427-b199-4c28-83c6-b5f85d882342)
 have the reasoning and the seven-step plan.
+
+### Not built yet, deliberately
+
+- **Notes on your own status changes.** The API accepts a `note` on every status
+  change and stores it, but only the Python worker sends one - the dropdown in the
+  table has nowhere to type. Human events therefore have no "why". Worth adding the
+  first time you want to explain one.
+- **Un-archiving is not recorded.** `ApplicationEventType` has no value for it, so
+  the timeline shows the archive but not the undo.
+- **Field edits are not recorded.** A PATCH that halves the salary leaves no trace.
+  That was a scope decision, not an oversight: it turns the timeline into an audit
+  log, and most rows would be noise.
