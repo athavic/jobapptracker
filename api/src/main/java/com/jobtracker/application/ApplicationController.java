@@ -42,7 +42,10 @@ public class ApplicationController {
 
     @GetMapping
     public PageResponse<ApplicationResponse> list(
-            @RequestParam(required = false) ApplicationStatus status,
+            // Repeatable: ?status=APPLIED&status=SCREEN. Spring binds either form,
+            // so a caller sending a single value - including every existing one -
+            // keeps working unchanged.
+            @RequestParam(required = false) List<ApplicationStatus> status,
             @RequestParam(required = false) String company,
             @RequestParam(defaultValue = "false") boolean includeArchived,
             // @ParameterObject flattens Pageable into page/size/sort in the OpenAPI

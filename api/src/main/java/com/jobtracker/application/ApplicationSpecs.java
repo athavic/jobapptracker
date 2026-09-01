@@ -3,6 +3,8 @@ package com.jobtracker.application;
 import jakarta.persistence.criteria.JoinType;
 import org.springframework.data.jpa.domain.Specification;
 
+import java.util.Collection;
+
 /**
  * Composable filters for the list endpoint.
  *
@@ -15,9 +17,18 @@ final class ApplicationSpecs {
     private ApplicationSpecs() {
     }
 
-    static Specification<JobApplication> hasStatus(ApplicationStatus status) {
-        return (root, query, cb) ->
-                status == null ? cb.conjunction() : cb.equal(root.get("status"), status);
+    /**
+     * Matches any of the given statuses, or every status when none are given.
+     *
+     * <p>An empty collection means "no filter", not "match nothing". Both readings
+     * are defensible in the abstract; this one is right here because the empty
+     * case is what the UI sends when you untick the last checkbox, and a filter
+     * that hides everything the moment you clear it reads as a broken page.</p>
+     */
+    static Specification<JobApplication> hasStatusIn(Collection<ApplicationStatus> statuses) {
+        return (root, query, cb) -> statuses == null || statuses.isEmpty()
+                ? cb.conjunction()
+                : root.get("status").in(statuses);
     }
 
     static Specification<JobApplication> companyNameContains(String fragment) {
