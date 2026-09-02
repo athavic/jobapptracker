@@ -7,6 +7,7 @@ import com.jobtracker.application.dto.CreateApplicationRequest;
 import com.jobtracker.application.dto.PageResponse;
 import com.jobtracker.application.dto.UpdateApplicationRequest;
 import com.jobtracker.common.Actor;
+import com.jobtracker.common.BusinessRuleException;
 import com.jobtracker.common.ActorContext;
 import com.jobtracker.common.InvalidStatusTransitionException;
 import com.jobtracker.common.NotFoundException;
@@ -317,7 +318,7 @@ public class ApplicationService {
         BigDecimal min = application.getSalaryMin();
         BigDecimal max = application.getSalaryMax();
         if (min != null && max != null && max.compareTo(min) < 0) {
-            throw new IllegalArgumentException(
+            throw new BusinessRuleException(
                     "salaryMax (" + max + ") must be greater than or equal to salaryMin (" + min + ")");
         }
     }

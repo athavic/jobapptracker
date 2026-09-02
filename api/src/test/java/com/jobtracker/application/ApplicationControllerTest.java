@@ -4,6 +4,7 @@ import com.jobtracker.application.dto.ApplicationEventResponse;
 import com.jobtracker.application.dto.ApplicationResponse;
 import com.jobtracker.application.dto.CompanySummary;
 import com.jobtracker.common.Actor;
+import com.jobtracker.common.BusinessRuleException;
 import com.jobtracker.common.InvalidStatusTransitionException;
 import com.jobtracker.common.NotFoundException;
 import org.junit.jupiter.api.DisplayName;
@@ -18,6 +19,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -174,6 +176,47 @@ class ApplicationControllerTest {
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors.salaryMin").exists());
+    }
+
+    @Test
+    @DisplayName("a business rule the service enforces is a 400 that explains itself")
+    void businessRuleViolationReturnsBadRequest() throws Exception {
+        willThrow(new BusinessRuleException("salaryMax (1) must be greater than or equal to salaryMin (2)"))
+                .given(service).create(any());
+
+        mockMvc.perform(post("/api/v1/applications")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"companyName": "Stripe", "roleTitle": "Engineer"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value(
+                        "salaryMax (1) must be greater than or equal to salaryMin (2)"));
+    }
+
+    @Test
+    @DisplayName("an unexpected IllegalArgumentException is not blamed on the caller")
+    void unexpectedIllegalArgumentIsNotBlamedOnTheCaller() throws Exception {
+        // The regression this guards: the handler used to catch every
+        // IllegalArgumentException, so a NumberFormatException from deep inside
+        // Jackson or a Spring internal came back as "your request was invalid",
+        // with the internal message attached. The caller then goes looking for a
+        // fault in a request that was fine, and the real bug never surfaces.
+        willThrow(new IllegalArgumentException("Comparison method violates its general contract!"))
+                .given(service).create(any());
+
+        // Asserted as "escapes the handler chain" rather than as a 500, because
+        // that is what a slice test can honestly see: MockMvc rethrows an
+        // exception nothing handled instead of synthesising the container's
+        // error page. Reaching the container at all is the point - that is the
+        // path that logs a stack trace and returns a 500.
+        assertThatThrownBy(() ->
+                mockMvc.perform(post("/api/v1/applications")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"companyName": "Stripe", "roleTitle": "Engineer"}
+                                """)))
+                .hasRootCauseInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

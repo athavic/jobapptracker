@@ -67,9 +67,15 @@ public class GlobalExceptionHandler {
         return problem;
     }
 
-    /** Business-rule rejections that are the caller's fault, e.g. salaryMax < salaryMin. */
-    @ExceptionHandler(IllegalArgumentException.class)
-    ProblemDetail onIllegalArgument(IllegalArgumentException ex) {
+    /**
+     * Business-rule rejections that are the caller's fault, e.g. salaryMax < salaryMin.
+     *
+     * <p>Deliberately {@link BusinessRuleException} and not
+     * {@code IllegalArgumentException}: see that class for why catching the
+     * broader type here turns genuine 500s into misleading 400s.
+     */
+    @ExceptionHandler(BusinessRuleException.class)
+    ProblemDetail onBusinessRuleViolation(BusinessRuleException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
         problem.setTitle("Invalid request");
         return problem;
