@@ -33,18 +33,9 @@ interface FormState {
 }
 
 /**
- * FIXED means one number, and that is a claim about the data, not a fallback.
+ * Determines whether an application represents a fixed salary amount.
  *
- * Only two shapes are genuinely one number: both bounds recorded and equal, or
- * no salary recorded at all - where FIXED is simply the friendlier empty form,
- * one box rather than two. Everything else is a range, including the one-sided
- * kind: "up to 200k" with no minimum is a range with an open end.
- *
- * Treating one-sided as FIXED is what made this worth writing down. FIXED mode
- * writes its single amount into BOTH `salaryMin` and `salaryMax` on save, so
- * opening a one-sided application and pressing Save - changing nothing else -
- * silently converted "up to 200k" into "exactly 200k". It needed no unusual
- * input and gave no sign it had happened.
+ * @returns `true` if both salary bounds are absent or equal, `false` otherwise.
  */
 function isSingleAmount(application: Application): boolean {
   const { salaryMin: min, salaryMax: max } = application
@@ -53,6 +44,12 @@ function isSingleAmount(application: Application): boolean {
   return min != null && max != null && min === max
 }
 
+/**
+ * Converts application data into the string-based state used by the edit form.
+ *
+ * @param application - The application to convert
+ * @returns The initialized form state
+ */
 function toFormState(application: Application): FormState {
   // Every field is a string here. Passing undefined to an input's value turns a
   // controlled input into an uncontrolled one, and React then stops updating it.

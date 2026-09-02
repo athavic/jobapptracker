@@ -36,6 +36,12 @@ import java.util.Map;
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class GlobalExceptionHandler {
 
+    /**
+     * Creates a not-found problem response for the handled exception.
+     *
+     * @param ex the exception describing the missing resource
+     * @return a problem detail with HTTP status 404, title {@code Not found}, and the exception message
+     */
     @ExceptionHandler(NotFoundException.class)
     ProblemDetail onNotFound(NotFoundException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
