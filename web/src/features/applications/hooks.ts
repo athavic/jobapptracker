@@ -8,7 +8,12 @@ import {
 } from '../../api/client'
 
 export interface ApplicationFilters {
-  status?: ApplicationStatus
+  /**
+   * Empty means "every status", matching the API: an absent filter and an
+   * empty one are the same request. Kept in lifecycle order by StatusFilter so
+   * the query key below stays stable regardless of the order you ticked boxes.
+   */
+  statuses?: ApplicationStatus[]
   company?: string
   includeArchived?: boolean
   page?: number
@@ -36,7 +41,11 @@ export function useApplications(filters: ApplicationFilters) {
         api.GET('/api/v1/applications', {
           params: {
             query: {
-              status: filters.status,
+              // openapi-fetch serialises an array as repeated params -
+              // ?status=APPLIED&status=SCREEN - which is exactly what Spring
+              // binds a List<ApplicationStatus> from. Undefined when empty so
+              // the request carries no status key at all.
+              status: filters.statuses?.length ? filters.statuses : undefined,
               company: filters.company || undefined,
               includeArchived: filters.includeArchived,
               page: filters.page ?? 0,
@@ -131,6 +140,55 @@ export function useArchiveApplication() {
   return useMutation({
     mutationFn: (id: number) =>
       unwrap(api.POST('/api/v1/applications/{id}/archive', { params: { path: { id } } })),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: applicationKeys.all })
+    },
+  })
+}
+
+/**
+ * Puts an archived application back on the board.
+ *
+ * There is no `/unarchive` endpoint to call - PATCH already accepts
+ * `archived: false`, and every other field left out means "leave alone", so
+ * this body says exactly one thing.
+ *
+ * Note what it does NOT do: un-archiving writes no event, because
+ * ApplicationEventType has no value for it. That is a deliberate gap on the
+ * server side rather than something missing here - see
+ * ApplicationService.setArchived. The timeline will show an Archived line with
+ * no matching Restored line, and that is expected.
+ */
+export function useRestoreApplication() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: number) =>
+      unwrap(
+        api.PATCH('/api/v1/applications/{id}', {
+          params: { path: { id } },
+          body: { archived: false },
+        }),
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: applicationKeys.all })
+    },
+  })
+}
+
+/**
+ * Really deletes. Archive is the one you almost always want.
+ *
+ * The row's events go with it - application_event has ON DELETE CASCADE - so
+ * this removes the history too, and with it whatever the row contributed to the
+ * funnel stats. That is why it sits behind a confirmation and archive does not.
+ */
+export function useDeleteApplication() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: number) =>
+      unwrap(api.DELETE('/api/v1/applications/{id}', { params: { path: { id } } })),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: applicationKeys.all })
     },

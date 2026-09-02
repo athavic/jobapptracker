@@ -410,7 +410,7 @@ export interface operations {
     list_1: {
         parameters: {
             query?: {
-                status?: "DISCOVERED" | "SAVED" | "APPLIED" | "SCREEN" | "INTERVIEW" | "OFFER" | "ACCEPTED" | "REJECTED" | "GHOSTED" | "WITHDRAWN";
+                status?: ("DISCOVERED" | "SAVED" | "APPLIED" | "SCREEN" | "INTERVIEW" | "OFFER" | "ACCEPTED" | "REJECTED" | "GHOSTED" | "WITHDRAWN")[];
                 company?: string;
                 includeArchived?: boolean;
                 /** @description Zero-based page index (0..N) */

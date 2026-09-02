@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -95,12 +96,12 @@ public class ApplicationService {
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<ApplicationResponse> search(ApplicationStatus status,
+    public PageResponse<ApplicationResponse> search(Collection<ApplicationStatus> statuses,
                                                     String companyName,
                                                     boolean includeArchived,
                                                     Pageable pageable) {
         Specification<JobApplication> spec = ApplicationSpecs.fetchCompany()
-                .and(ApplicationSpecs.hasStatus(status))
+                .and(ApplicationSpecs.hasStatusIn(statuses))
                 .and(ApplicationSpecs.companyNameContains(companyName))
                 .and(ApplicationSpecs.archivedFilter(includeArchived));
 

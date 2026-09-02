@@ -1,6 +1,11 @@
-# Job Application Tracker
+# Pendency
 
 A job application tracker with an automation dashboard. Four services, one source of truth.
+
+> **pendency** *(n.)* — the state of being pending. It is the state most of your
+> applications are in most of the time, and the one this app exists to make visible.
+
+Domain: `pendency.app` (`.com` was being resold for $9,999; `.app` was not).
 
 | Piece | Stack | Status |
 |---|---|---|
@@ -10,7 +15,7 @@ A job application tracker with an automation dashboard. Four services, one sourc
 | `automation/` | Python 3.14 · httpx · pydantic | **phase 3 — working** |
 | History | `application_event` across all three | **phase 4 — working** |
 
-Architecture and full build plan: [Job Tracker Blueprint](https://claude.ai/code/artifact/e244d427-b199-4c28-83c6-b5f85d882342)
+Architecture and full build plan: [Pendency Blueprint](https://claude.ai/code/artifact/e244d427-b199-4c28-83c6-b5f85d882342)
 
 ---
 
@@ -106,7 +111,7 @@ their parent and keep holding the ports - so the next `npm run dev` fails with
 npm test
 ```
 
-Thirty-three tests, no database needed: the lifecycle rules run as plain unit tests, and
+Thirty-six tests, no database needed: the lifecycle rules run as plain unit tests, and
 the controllers run as `@WebMvcTest` slices with the service mocked.
 
 ```bash
@@ -196,7 +201,7 @@ resources/db/migration/
 
 | | Path | |
 |---|---|---|
-| `GET` | `/api/v1/applications` | `?status=&company=&includeArchived=&page=&size=&sort=` |
+| `GET` | `/api/v1/applications` | `?status=&company=&includeArchived=&page=&size=&sort=` — `status` repeats: `?status=APPLIED&status=SCREEN` |
 | `POST` | `/api/v1/applications` | 201 + `Location` header |
 | `GET` | `/api/v1/applications/{id}` | |
 | `PATCH` | `/api/v1/applications/{id}` | null fields mean "leave alone" |
@@ -218,12 +223,15 @@ web/src/
     client.ts          typed client, ApiError, unwrap()
   features/applications/
     ApplicationsPage.tsx    filters + paging
-    ApplicationsTable.tsx   rows + the status control
+    ApplicationsTable.tsx   rows, the status control and the row menu
     ApplicationTimeline.tsx the history dialog
     CreateApplicationForm.tsx
     StatusBadge.tsx
     hooks.ts                queries, mutations, query keys
-  components/ErrorNotice.tsx
+  components/
+    ErrorNotice.tsx    whatever the API actually said
+    RowMenu.tsx        the per-row `⋯` menu
+    ConfirmDialog.tsx  used before anything irreversible
   lib/                 formatting, query client
 ```
 
@@ -243,6 +251,19 @@ web/src/
   `allowedNextStatuses`, which the server computes from the same enum it enforces. The
   rules cannot drift because they exist once.
 - **Mutations invalidate, they do not patch the cache.** Simpler, and always correct.
+
+- **Archive and delete are not two strengths of the same button.** Archive means "this
+  is over, stop showing it to me" - the row keeps its history and keeps counting towards
+  the funnel stats. Delete means "this should never have existed": a typo, a duplicate.
+  It cascades to `application_event` and takes the history with it. Exposed as equal
+  choices, delete gets used for rejections because it feels more final, and the stats
+  quietly rot - so archive is one click and delete needs a confirmation.
+- **Friction matches reversibility, not severity.** That is the rule behind the row
+  menu: the destructive item is last, separated, red, and asks first, while everything
+  undoable acts immediately.
+- **The row menu is a `popover`.** Not for novelty - the table sits inside
+  `overflow-x-auto`, and an absolutely positioned dropdown inside a scroll container is
+  clipped by it. The top layer is the only place the menu can render in full.
 - **History is written in the same transaction as the change.** `application_event`
   rows are saved inside `changeStatus`, not after it, so there is no window where the
   status moved but the history did not. A history with gaps is worse than none, because
