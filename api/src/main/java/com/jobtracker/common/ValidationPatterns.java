@@ -19,6 +19,22 @@ public final class ValidationPatterns {
      */
     public static final String HTTP_URL = "^\\s*$|^https?://\\S+$";
 
+    /**
+     * At least one non-whitespace character.
+     *
+     * <p>This is {@code @NotBlank} for a PATCH field, and the difference is the
+     * whole reason it exists. {@code @NotBlank} fails on null, but null is how
+     * PATCH says "leave this alone" - so annotating an optional field with it
+     * would make every partial update illegal unless it sent every field.
+     * {@code @Pattern} skips null and checks everything else, which is exactly
+     * the rule wanted: absent is fine, present-but-empty is not.
+     *
+     * <p>{@code (?s)} so that {@code .} also matches a newline. Without it a
+     * value of "\n x" would be rejected, because the match must cover the whole
+     * string.
+     */
+    public static final String NON_BLANK = "(?s).*\\S.*";
+
     private ValidationPatterns() {
     }
 }

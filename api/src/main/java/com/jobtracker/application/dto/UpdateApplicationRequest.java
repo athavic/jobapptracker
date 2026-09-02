@@ -24,8 +24,22 @@ import java.math.BigDecimal;
  */
 public record UpdateApplicationRequest(
 
-        @Size(max = 200) String companyName,
-        @Size(max = 250) String roleTitle,
+        /*
+         * Null is still "leave alone", but a value that is present must be a
+         * real one. Without this, PATCH {"roleTitle": "  "} sets the title to
+         * an empty string, and PATCH {"companyName": "  "} creates a company
+         * named "" which then owns the unique-name slot permanently. The
+         * browser's `required` attribute does not protect the API - curl, the
+         * Python worker and every future client bypass it.
+         */
+        @Size(max = 200)
+        @Pattern(regexp = ValidationPatterns.NON_BLANK, message = "must not be blank")
+        String companyName,
+
+        @Size(max = 250)
+        @Pattern(regexp = ValidationPatterns.NON_BLANK, message = "must not be blank")
+        String roleTitle,
+
         @Size(max = 64) String source,
         @Pattern(regexp = ValidationPatterns.HTTP_URL,
                 message = "must be an absolute URL starting with http:// or https://")

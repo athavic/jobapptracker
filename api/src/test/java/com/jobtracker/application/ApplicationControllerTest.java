@@ -26,6 +26,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -176,6 +177,45 @@ class ApplicationControllerTest {
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors.salaryMin").exists());
+    }
+
+    @Test
+    @DisplayName("PATCH leaves out whatever it does not mention")
+    void patchWithoutCompanyOrRoleIsFine() throws Exception {
+        given(service.update(eq(1L), any())).willReturn(sampleResponse());
+
+        // The case the blank check must not break: absent still means
+        // "leave alone", which is the entire contract of this endpoint.
+        mockMvc.perform(patch("/api/v1/applications/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"location": "Berlin"}
+                                """))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("PATCH refuses to blank out the role title")
+    void patchRejectsBlankRoleTitle() throws Exception {
+        mockMvc.perform(patch("/api/v1/applications/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"roleTitle": "   "}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors.roleTitle").exists());
+    }
+
+    @Test
+    @DisplayName("PATCH refuses to blank out the company, which would create a nameless one")
+    void patchRejectsBlankCompanyName() throws Exception {
+        mockMvc.perform(patch("/api/v1/applications/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"companyName": ""}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors.companyName").exists());
     }
 
     @Test
