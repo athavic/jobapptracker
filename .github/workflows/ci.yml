@@ -54,7 +54,14 @@ jobs:
       - run: npm run lint
         working-directory: web
 
-      # build runs `tsc -b` first, so this is the typecheck too.
+      # Vitest, in a node environment - no browser, so nothing here needs a
+      # headless Chrome on the runner. Covers the pure logic behind the
+      # components; see the note in vite.config.ts for where that line is drawn.
+      - run: npm run test
+        working-directory: web
+
+      # build runs `tsc -b` first, so this is the typecheck too - and `src`
+      # includes the .test.ts files, so a type error in a test fails here.
       - run: npm run build
         working-directory: web
 
