@@ -5,6 +5,7 @@ import com.jobtracker.application.dto.ApplicationResponse;
 import com.jobtracker.application.dto.CompanySummary;
 import com.jobtracker.common.Actor;
 import com.jobtracker.common.BusinessRuleException;
+import com.jobtracker.common.FieldLimits;
 import com.jobtracker.common.InvalidStatusTransitionException;
 import com.jobtracker.common.NotFoundException;
 import org.junit.jupiter.api.DisplayName;
@@ -177,6 +178,18 @@ class ApplicationControllerTest {
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors.salaryMin").exists());
+    }
+
+    @Test
+    @DisplayName("notes has an upper bound, because its column does not")
+    void createRejectsOversizedNotes() throws Exception {
+        mockMvc.perform(post("/api/v1/applications")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.format("""
+                                {"companyName": "Stripe", "roleTitle": "Engineer", "notes": "%s"}
+                                """, "n".repeat(FieldLimits.NOTES + 1))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors.notes").exists());
     }
 
     @Test
