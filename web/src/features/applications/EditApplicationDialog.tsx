@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import type {
-  Application,
-  ApplicationStatus,
-  SalaryPeriod,
-  UpdateApplicationBody,
-} from '../../api/client'
+import type { Application, ApplicationStatus, SalaryPeriod } from '../../api/client'
 import { ErrorNotice } from '../../components/ErrorNotice'
 import { CURRENCY_OPTIONS } from '../../lib/currencies'
 import { titleCase } from '../../lib/format'
+import {
+  toFormState,
+  toRequestBody,
+  type FormState,
+  type SalaryMode,
+} from './editApplicationForm'
 import { StatusBadge } from './StatusBadge'
 import { useChangeStatus, useUpdateApplication } from './hooks'
 
@@ -15,82 +16,6 @@ const inputClass =
   'w-full rounded-md border border-line bg-surface px-3 py-2 text-sm outline-none placeholder:text-muted focus:border-brand focus:ring-2 focus:ring-brand/20'
 
 const labelClass = 'block text-xs font-medium text-ink-soft mb-1'
-
-type SalaryMode = 'FIXED' | 'RANGE'
-
-/** The editable fields, as strings, because that is what inputs deal in. */
-interface FormState {
-  companyName: string
-  roleTitle: string
-  location: string
-  jobUrl: string
-  salaryMode: SalaryMode
-  salaryAmount: string
-  salaryMin: string
-  salaryMax: string
-  currency: string
-  salaryPeriod: SalaryPeriod
-}
-
-/**
- * FIXED means one number, and that is a claim about the data, not a fallback.
- *
- * Only two shapes are genuinely one number: both bounds recorded and equal, or
- * no salary recorded at all - where FIXED is simply the friendlier empty form,
- * one box rather than two. Everything else is a range, including the one-sided
- * kind: "up to 200k" with no minimum is a range with an open end.
- *
- * Treating one-sided as FIXED is what made this worth writing down. FIXED mode
- * writes its single amount into BOTH `salaryMin` and `salaryMax` on save, so
- * opening a one-sided application and pressing Save - changing nothing else -
- * silently converted "up to 200k" into "exactly 200k". It needed no unusual
- * input and gave no sign it had happened.
- */
-function isSingleAmount(application: Application): boolean {
-  const { salaryMin: min, salaryMax: max } = application
-
-  if (min == null && max == null) return true
-  return min != null && max != null && min === max
-}
-
-function toFormState(application: Application): FormState {
-  // Every field is a string here. Passing undefined to an input's value turns a
-  // controlled input into an uncontrolled one, and React then stops updating it.
-  return {
-    companyName: application.company.name,
-    roleTitle: application.roleTitle,
-    location: application.location ?? '',
-    jobUrl: application.jobUrl ?? '',
-    salaryMode: isSingleAmount(application) ? 'FIXED' : 'RANGE',
-    salaryAmount: (application.salaryMin ?? application.salaryMax)?.toString() ?? '',
-    salaryMin: application.salaryMin?.toString() ?? '',
-    salaryMax: application.salaryMax?.toString() ?? '',
-    currency: application.currency ?? '',
-    salaryPeriod: application.salaryPeriod ?? 'ANNUAL',
-  }
-}
-
-function toRequestBody(form: FormState): UpdateApplicationBody {
-  const number = (value: string) => (value.trim() === '' ? undefined : Number(value))
-  const fixedAmount = number(form.salaryAmount)
-  const hasSalary =
-    form.salaryMode === 'FIXED'
-      ? fixedAmount != null
-      : number(form.salaryMin) != null || number(form.salaryMax) != null
-
-  return {
-    companyName: form.companyName.trim(),
-    roleTitle: form.roleTitle.trim(),
-    // Blank is sent through rather than dropped: the API turns "" into null,
-    // which is how a field gets cleared.
-    location: form.location,
-    jobUrl: form.jobUrl,
-    salaryMin: form.salaryMode === 'FIXED' ? fixedAmount : number(form.salaryMin),
-    salaryMax: form.salaryMode === 'FIXED' ? fixedAmount : number(form.salaryMax),
-    currency: form.currency.trim() === '' ? undefined : form.currency.trim(),
-    salaryPeriod: hasSalary ? form.salaryPeriod : undefined,
-  }
-}
 
 export function EditApplicationDialog({
   application,
