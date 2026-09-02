@@ -3,6 +3,7 @@ package com.jobtracker.application.dto;
 import com.jobtracker.application.ApplicationStatus;
 import com.jobtracker.application.RemoteType;
 import com.jobtracker.application.SalaryPeriod;
+import com.jobtracker.common.FieldLimits;
 import com.jobtracker.common.ValidationPatterns;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -51,7 +52,8 @@ public record CreateApplicationRequest(
 
         @Size(max = 100) String resumeVersion,
 
-        String notes,
+        // TEXT column, so there is no length to mirror - see FieldLimits.
+        @Size(max = FieldLimits.NOTES) String notes,
 
         Instant appliedAt
 ) {

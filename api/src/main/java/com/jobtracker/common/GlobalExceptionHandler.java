@@ -2,6 +2,7 @@ package com.jobtracker.common;
 
 import com.jobtracker.automation.RunAlreadyFinishedException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -58,6 +59,31 @@ public class GlobalExceptionHandler {
         return problem;
     }
 
+    /**
+     * Someone else wrote this row between our read and our write.
+     *
+     * <p>A 409 rather than a 500, and that mapping is the entire reason the
+     * version column is worth having. Without it an optimistic-lock failure is
+     * an unhandled exception: the caller sees a server error, the worker treats
+     * it as the API being broken and fails its whole run, and a human's edit
+     * looks like an outage. With it, the answer is "your view of this
+     * application was stale" - which nudge_stale already knows how to act on,
+     * because it skips 409s and lets the other writer's change stand.
+     *
+     * <p>Retrying here would be wrong. The caller decided to move to GHOSTED
+     * based on a state that is no longer true; the fix is to look again, which
+     * only the caller can do.
+     */
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    ProblemDetail onConcurrentModification(OptimisticLockingFailureException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.CONFLICT,
+                "This application was changed by someone else while you were working on it. "
+                        + "Reload it and try again.");
+        problem.setTitle("Concurrent modification");
+        return problem;
+    }
+
     /** A database constraint said no - unique name, check constraint, foreign key. */
     @ExceptionHandler(DataIntegrityViolationException.class)
     ProblemDetail onConstraintViolation(DataIntegrityViolationException ex) {
@@ -67,9 +93,15 @@ public class GlobalExceptionHandler {
         return problem;
     }
 
-    /** Business-rule rejections that are the caller's fault, e.g. salaryMax < salaryMin. */
-    @ExceptionHandler(IllegalArgumentException.class)
-    ProblemDetail onIllegalArgument(IllegalArgumentException ex) {
+    /**
+     * Business-rule rejections that are the caller's fault, e.g. salaryMax < salaryMin.
+     *
+     * <p>Deliberately {@link BusinessRuleException} and not
+     * {@code IllegalArgumentException}: see that class for why catching the
+     * broader type here turns genuine 500s into misleading 400s.
+     */
+    @ExceptionHandler(BusinessRuleException.class)
+    ProblemDetail onBusinessRuleViolation(BusinessRuleException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
         problem.setTitle("Invalid request");
         return problem;

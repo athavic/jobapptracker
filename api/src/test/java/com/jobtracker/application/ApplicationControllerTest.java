@@ -5,6 +5,8 @@ import com.jobtracker.application.dto.ApplicationResponse;
 import com.jobtracker.application.dto.PageResponse;
 import com.jobtracker.application.dto.CompanySummary;
 import com.jobtracker.common.Actor;
+import com.jobtracker.common.BusinessRuleException;
+import com.jobtracker.common.FieldLimits;
 import com.jobtracker.common.InvalidStatusTransitionException;
 import com.jobtracker.common.NotFoundException;
 import org.junit.jupiter.api.DisplayName;
@@ -13,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -21,6 +24,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
@@ -31,6 +35,7 @@ import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -181,6 +186,118 @@ class ApplicationControllerTest {
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors.salaryMin").exists());
+    }
+
+    @Test
+    @DisplayName("losing an optimistic-lock race is a 409, not a 500")
+    void concurrentModificationReturnsConflict() throws Exception {
+        // What makes the version column useful is this mapping. Unhandled, a
+        // lock failure is a server error: the Python worker reads that as "the
+        // API is broken" and fails its whole run, when the truth is the far
+        // less alarming "a human edited this row while you were scanning".
+        // 409 is a status nudge_stale already handles by skipping the row.
+        willThrow(new OptimisticLockingFailureException("Row was updated by another transaction"))
+                .given(service).changeStatus(eq(1L), any());
+
+        mockMvc.perform(post("/api/v1/applications/1/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"status": "GHOSTED"}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Concurrent modification"));
+    }
+
+    @Test
+    @DisplayName("notes has an upper bound, because its column does not")
+    void createRejectsOversizedNotes() throws Exception {
+        mockMvc.perform(post("/api/v1/applications")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(String.format("""
+                                {"companyName": "Stripe", "roleTitle": "Engineer", "notes": "%s"}
+                                """, "n".repeat(FieldLimits.NOTES + 1))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors.notes").exists());
+    }
+
+    @Test
+    @DisplayName("PATCH leaves out whatever it does not mention")
+    void patchWithoutCompanyOrRoleIsFine() throws Exception {
+        given(service.update(eq(1L), any())).willReturn(sampleResponse());
+
+        // The case the blank check must not break: absent still means
+        // "leave alone", which is the entire contract of this endpoint.
+        mockMvc.perform(patch("/api/v1/applications/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"location": "Berlin"}
+                                """))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("PATCH refuses to blank out the role title")
+    void patchRejectsBlankRoleTitle() throws Exception {
+        mockMvc.perform(patch("/api/v1/applications/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"roleTitle": "   "}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors.roleTitle").exists());
+    }
+
+    @Test
+    @DisplayName("PATCH refuses to blank out the company, which would create a nameless one")
+    void patchRejectsBlankCompanyName() throws Exception {
+        mockMvc.perform(patch("/api/v1/applications/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"companyName": ""}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors.companyName").exists());
+    }
+
+    @Test
+    @DisplayName("a business rule the service enforces is a 400 that explains itself")
+    void businessRuleViolationReturnsBadRequest() throws Exception {
+        willThrow(new BusinessRuleException("salaryMax (1) must be greater than or equal to salaryMin (2)"))
+                .given(service).create(any());
+
+        mockMvc.perform(post("/api/v1/applications")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"companyName": "Stripe", "roleTitle": "Engineer"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value(
+                        "salaryMax (1) must be greater than or equal to salaryMin (2)"));
+    }
+
+    @Test
+    @DisplayName("an unexpected IllegalArgumentException is not blamed on the caller")
+    void unexpectedIllegalArgumentIsNotBlamedOnTheCaller() throws Exception {
+        // The regression this guards: the handler used to catch every
+        // IllegalArgumentException, so a NumberFormatException from deep inside
+        // Jackson or a Spring internal came back as "your request was invalid",
+        // with the internal message attached. The caller then goes looking for a
+        // fault in a request that was fine, and the real bug never surfaces.
+        willThrow(new IllegalArgumentException("Comparison method violates its general contract!"))
+                .given(service).create(any());
+
+        // Asserted as "escapes the handler chain" rather than as a 500, because
+        // that is what a slice test can honestly see: MockMvc rethrows an
+        // exception nothing handled instead of synthesising the container's
+        // error page. Reaching the container at all is the point - that is the
+        // path that logs a stack trace and returns a 500.
+        assertThatThrownBy(() ->
+                mockMvc.perform(post("/api/v1/applications")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"companyName": "Stripe", "roleTitle": "Engineer"}
+                                """)))
+                .hasRootCauseInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

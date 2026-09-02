@@ -52,7 +52,7 @@ class HeaderActorContext implements ActorContext {
             // would then file every one of its writes under "a person did this",
             // and the actor column would be quietly wrong exactly where it is
             // most load-bearing. A 400 is noisy; wrong provenance is worse.
-            throw new IllegalArgumentException(
+            throw new BusinessRuleException(
                     ACTOR_HEADER + " must be one of " + Arrays.toString(Actor.values())
                             + " (got '" + raw + "')");
         }
@@ -72,7 +72,7 @@ class HeaderActorContext implements ActorContext {
 
         String trimmed = raw.trim();
         if (trimmed.length() > MAX_DETAIL_LENGTH) {
-            throw new IllegalArgumentException(
+            throw new BusinessRuleException(
                     DETAIL_HEADER + " must be at most " + MAX_DETAIL_LENGTH + " characters");
         }
         return trimmed;

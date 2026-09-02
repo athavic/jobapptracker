@@ -4,6 +4,7 @@ import com.jobtracker.application.dto.PageResponse;
 import com.jobtracker.automation.dto.AutomationRunResponse;
 import com.jobtracker.automation.dto.CompleteRunRequest;
 import com.jobtracker.automation.dto.StartRunRequest;
+import com.jobtracker.common.BusinessRuleException;
 import com.jobtracker.common.NotFoundException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -54,7 +55,7 @@ public class AutomationRunService {
                 .orElseThrow(() -> new NotFoundException("Automation run", id));
 
         if (request.status() == AutomationRunStatus.RUNNING) {
-            throw new IllegalArgumentException(
+            throw new BusinessRuleException(
                     "status must be SUCCEEDED or FAILED when completing a run");
         }
         if (run.getStatus().isFinished()) {
@@ -65,7 +66,7 @@ public class AutomationRunService {
         Instant finishedAt =
                 request.finishedAt() != null ? request.finishedAt() : Instant.now();
         if (finishedAt.isBefore(run.getStartedAt())) {
-            throw new IllegalArgumentException("finishedAt cannot be before startedAt");
+            throw new BusinessRuleException("finishedAt cannot be before startedAt");
         }
 
         run.finish(

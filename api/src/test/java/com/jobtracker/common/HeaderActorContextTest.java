@@ -57,8 +57,11 @@ class HeaderActorContextTest {
         // The whole point of the column is provenance. A typo that quietly
         // recorded a bot's write as a person's would corrupt the one field
         // nobody would think to double-check.
+        //
+        // BusinessRuleException rather than IllegalArgumentException: only
+        // exceptions this code raises on purpose earn a 400. See that class.
         assertThatThrownBy(context::current)
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("X-Actor");
     }
 
@@ -69,7 +72,7 @@ class HeaderActorContextTest {
         request.addHeader("X-Actor-Detail", "j".repeat(65));
         bind(request);
 
-        assertThatThrownBy(context::detail).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(context::detail).isInstanceOf(BusinessRuleException.class);
     }
 
     @Test
