@@ -15,9 +15,6 @@ spring:
     # false = no lazy loading outside a transaction. Forces you to fetch what
     # you need in the service layer, which is how you avoid surprise N+1s.
     open-in-view: false
-    show-sql: true
-    properties:
-      hibernate.format_sql: true
 
   flyway:
     enabled: true
@@ -38,6 +35,4 @@ springdoc:
 
 logging:
   level:
-    # uncomment to see the values bound into each query
-    # org.hibernate.orm.jdbc.bind: TRACE
     org.flywaydb: INFO

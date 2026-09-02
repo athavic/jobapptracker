@@ -84,6 +84,18 @@
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
+        <!--
+          `mvn spring-boot:run` is the local-development entry point, so it is
+          the right place to switch on the dev profile. Activating it here
+          rather than in application.yml is what keeps the default safe: a
+          packaged jar started with `java -jar` - CI, and any future
+          deployment - runs without it and therefore without SQL logging.
+        -->
+        <configuration>
+          <profiles>
+            <profile>dev</profile>
+          </profiles>
+        </configuration>
       </plugin>
     </plugins>
   </build>
