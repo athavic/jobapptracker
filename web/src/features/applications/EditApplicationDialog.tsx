@@ -32,12 +32,28 @@ interface FormState {
   salaryPeriod: SalaryPeriod
 }
 
-function toFormState(application: Application): FormState {
-  const salaryIsRange =
-    application.salaryMin != null &&
-    application.salaryMax != null &&
-    application.salaryMin !== application.salaryMax
+/**
+ * FIXED means one number, and that is a claim about the data, not a fallback.
+ *
+ * Only two shapes are genuinely one number: both bounds recorded and equal, or
+ * no salary recorded at all - where FIXED is simply the friendlier empty form,
+ * one box rather than two. Everything else is a range, including the one-sided
+ * kind: "up to 200k" with no minimum is a range with an open end.
+ *
+ * Treating one-sided as FIXED is what made this worth writing down. FIXED mode
+ * writes its single amount into BOTH `salaryMin` and `salaryMax` on save, so
+ * opening a one-sided application and pressing Save - changing nothing else -
+ * silently converted "up to 200k" into "exactly 200k". It needed no unusual
+ * input and gave no sign it had happened.
+ */
+function isSingleAmount(application: Application): boolean {
+  const { salaryMin: min, salaryMax: max } = application
 
+  if (min == null && max == null) return true
+  return min != null && max != null && min === max
+}
+
+function toFormState(application: Application): FormState {
   // Every field is a string here. Passing undefined to an input's value turns a
   // controlled input into an uncontrolled one, and React then stops updating it.
   return {
@@ -45,7 +61,7 @@ function toFormState(application: Application): FormState {
     roleTitle: application.roleTitle,
     location: application.location ?? '',
     jobUrl: application.jobUrl ?? '',
-    salaryMode: salaryIsRange ? 'RANGE' : 'FIXED',
+    salaryMode: isSingleAmount(application) ? 'FIXED' : 'RANGE',
     salaryAmount: (application.salaryMin ?? application.salaryMax)?.toString() ?? '',
     salaryMin: application.salaryMin?.toString() ?? '',
     salaryMax: application.salaryMax?.toString() ?? '',
