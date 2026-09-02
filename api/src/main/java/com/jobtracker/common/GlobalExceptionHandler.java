@@ -1,6 +1,8 @@
 package com.jobtracker.common;
 
 import com.jobtracker.automation.RunAlreadyFinishedException;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
@@ -16,8 +18,22 @@ import java.util.Map;
  * Turns exceptions into RFC 9457 "problem detail" JSON, so every error the API
  * returns has the same shape. Without this you get Spring's default HTML error
  * page or a stack trace, and the frontend has nothing reliable to parse.
+ *
+ * <p>The {@code @Order} is not decoration, and it is required by
+ * {@code spring.mvc.problemdetails.enabled} rather than merely tidy alongside
+ * it. Switching that setting on registers Spring's own advice at
+ * {@code @Order(0)}, and that advice handles
+ * {@link MethodArgumentNotValidException} too - the exact exception this class
+ * handles below in order to attach {@code fieldErrors}. Advice is consulted in
+ * order, so without this annotation the default (lowest precedence) puts this
+ * class second, Spring's plainer body wins, and every field-level validation
+ * message silently stops reaching the form that displays it. Six tests fail
+ * when it is removed, which is the cheapest available proof that it is
+ * load-bearing. Being explicit lets the two coexist: this class answers what
+ * it knows about, Spring answers the rest.
  */
 @RestControllerAdvice
+@Order(Ordered.HIGHEST_PRECEDENCE)
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(NotFoundException.class)
