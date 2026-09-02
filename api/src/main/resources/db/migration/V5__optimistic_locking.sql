@@ -1,0 +1,22 @@
+-- Phase 4.5: give job_application a version column so concurrent writers cannot
+-- silently overwrite each other.
+--
+-- The gap this closes. changeStatus reads the application, asks the status enum
+-- whether the move is legal, and writes - three steps with nothing holding the
+-- row in between. Two callers can therefore both read APPLIED, both be told
+-- that GHOSTED is legal, and both write. The second write wins, and the event
+-- table ends up with two STATUS_CHANGED rows claiming to leave the same state:
+-- a timeline that shows one application forking into two.
+--
+-- This stopped being hypothetical in phase 3. nudge_stale scans and then writes,
+-- so a human moving an application while the job is mid-run is an ordinary
+-- Tuesday, not a race you have to contrive. The worker already does the right
+-- thing with a 409 - it records the skip and lets the human's change stand - it
+-- just had no way to be told.
+--
+-- DEFAULT 0 matters for the rows that already exist: Hibernate reads the column
+-- into a version field that cannot be null, and a NULL here would fail on the
+-- first update of every pre-existing application rather than at migration time,
+-- which is the worst place to find out.
+ALTER TABLE job_application
+    ADD COLUMN version BIGINT NOT NULL DEFAULT 0;

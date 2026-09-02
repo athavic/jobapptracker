@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -178,6 +179,26 @@ class ApplicationControllerTest {
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors.salaryMin").exists());
+    }
+
+    @Test
+    @DisplayName("losing an optimistic-lock race is a 409, not a 500")
+    void concurrentModificationReturnsConflict() throws Exception {
+        // What makes the version column useful is this mapping. Unhandled, a
+        // lock failure is a server error: the Python worker reads that as "the
+        // API is broken" and fails its whole run, when the truth is the far
+        // less alarming "a human edited this row while you were scanning".
+        // 409 is a status nudge_stale already handles by skipping the row.
+        willThrow(new OptimisticLockingFailureException("Row was updated by another transaction"))
+                .given(service).changeStatus(eq(1L), any());
+
+        mockMvc.perform(post("/api/v1/applications/1/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"status": "GHOSTED"}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("Concurrent modification"));
     }
 
     @Test

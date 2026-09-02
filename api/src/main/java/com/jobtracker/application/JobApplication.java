@@ -12,6 +12,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -94,6 +95,24 @@ public class JobApplication {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    /**
+     * Optimistic locking. Hibernate adds {@code AND version = ?} to every UPDATE
+     * of this row and increments the column; if no row matches, someone else
+     * wrote first and the commit fails rather than overwriting them.
+     *
+     * <p>Optimistic rather than a {@code SELECT ... FOR UPDATE}: conflicts here
+     * are rare - one person and one worker - and the pessimistic version would
+     * make every read of every application pay for a collision that almost never
+     * happens. This costs nothing until two writers actually meet.
+     *
+     * <p>No getter. Nothing in the application should read or reason about this;
+     * it is a fact about the row, not about the job application. See
+     * V5__optimistic_locking.sql for the race it closes.
+     */
+    @Version
+    @Column(nullable = false)
+    private long version;
 
     protected JobApplication() {
     }
