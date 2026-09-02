@@ -32,12 +32,25 @@ interface FormState {
   salaryPeriod: SalaryPeriod
 }
 
-function toFormState(application: Application): FormState {
-  const salaryIsRange =
-    application.salaryMin != null &&
-    application.salaryMax != null &&
-    application.salaryMin !== application.salaryMax
+/**
+ * Determines whether an application represents a fixed salary amount.
+ *
+ * @returns `true` if both salary bounds are absent or equal, `false` otherwise.
+ */
+function isSingleAmount(application: Application): boolean {
+  const { salaryMin: min, salaryMax: max } = application
 
+  if (min == null && max == null) return true
+  return min != null && max != null && min === max
+}
+
+/**
+ * Converts application data into the string-based state used by the edit form.
+ *
+ * @param application - The application to convert
+ * @returns The initialized form state
+ */
+function toFormState(application: Application): FormState {
   // Every field is a string here. Passing undefined to an input's value turns a
   // controlled input into an uncontrolled one, and React then stops updating it.
   return {
@@ -45,7 +58,7 @@ function toFormState(application: Application): FormState {
     roleTitle: application.roleTitle,
     location: application.location ?? '',
     jobUrl: application.jobUrl ?? '',
-    salaryMode: salaryIsRange ? 'RANGE' : 'FIXED',
+    salaryMode: isSingleAmount(application) ? 'FIXED' : 'RANGE',
     salaryAmount: (application.salaryMin ?? application.salaryMax)?.toString() ?? '',
     salaryMin: application.salaryMin?.toString() ?? '',
     salaryMax: application.salaryMax?.toString() ?? '',

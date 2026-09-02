@@ -7,6 +7,22 @@ spring:
     username: ${DB_USER:jobtracker}
     password: ${DB_PASSWORD:jobtracker}
 
+  mvc:
+    problemdetails:
+      # Makes Spring's OWN exceptions answer in RFC 9457 too.
+      #
+      # GlobalExceptionHandler only sees exceptions this code throws. Everything
+      # Spring rejects before a controller method runs - an unparseable status
+      # in the query string, malformed JSON, the wrong content type - was
+      # answered with Boot's default {timestamp, status, error, path} body
+      # instead. That body has no `detail` field, so the React ErrorNotice had
+      # nothing to show but "Request failed with status 400", and the promise
+      # that every error from this API has one shape was quietly untrue.
+      #
+      # See the @Order on GlobalExceptionHandler for what this setting requires
+      # in return.
+      enabled: true
+
   jpa:
     hibernate:
       # validate, never update. Flyway owns the schema; Hibernate only checks

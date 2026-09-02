@@ -37,6 +37,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -366,11 +367,39 @@ class ApplicationControllerTest {
         assertThat(capturedStatuses()).isNull();
     }
 
+    /**
+     * The status assertion was always here; the body assertions are the point.
+     *
+     * <p>Spring rejects this before the controller method runs, so
+     * GlobalExceptionHandler never sees it - which used to mean the one error
+     * shape the frontend knows how to read did not apply to it. It answered
+     * with Boot's default body, whose only readable field is a generic "Bad
+     * Request", and ErrorNotice had nothing to print but the status code.
+     * spring.mvc.problemdetails.enabled is what closes that gap.
+     */
     @Test
-    @DisplayName("an unknown status is a 400, not silently ignored")
+    @DisplayName("an unknown status is a 400, and a problem detail like every other error")
     void listRejectsAnUnknownStatus() throws Exception {
         mockMvc.perform(get("/api/v1/applications").param("status", "PENDING"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.detail").exists());
+    }
+
+    /**
+     * The same gap, reached a different way: a body Jackson cannot parse is
+     * rejected before any controller method too. Worth its own test because it
+     * is the failure a hand-written curl hits first.
+     */
+    @Test
+    @DisplayName("a malformed body is a problem detail, not Boot's default error page")
+    void malformedJsonIsAProblemDetail() throws Exception {
+        mockMvc.perform(post("/api/v1/applications")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"companyName\": "))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.detail").exists());
     }
 
     @SuppressWarnings("unchecked")
@@ -384,6 +413,7 @@ class ApplicationControllerTest {
         return new PageResponse<>(List.of(), 0, 20, 0, 0, true, true);
     }
 
+    @Test
     @DisplayName("archiving returns 204 and no body")
     void archiveReturnsNoContent() throws Exception {
         mockMvc.perform(post("/api/v1/applications/1/archive"))
