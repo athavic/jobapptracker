@@ -14,6 +14,7 @@ Domain: `pendency.app` (`.com` was being resold for $9,999; `.app` was not).
 | `web/` | React 19 · TypeScript 5 · Vite 8 · Tailwind 4 | **phase 2 — working** |
 | `automation/` | Python 3.14 · httpx · pydantic | **phase 3 — working** |
 | History | `application_event` across all three | **phase 4 — working** |
+| Multi-user | workspaces · Google sign-in · scoped queries · RLS | **phase 5 — 5a-5e done** |
 
 Architecture and full build plan: [Pendency Blueprint](https://claude.ai/code/artifact/e244d427-b199-4c28-83c6-b5f85d882342)
 
@@ -111,14 +112,28 @@ their parent and keep holding the ports - so the next `npm run dev` fails with
 npm test
 ```
 
-Thirty-six tests, no database needed: the lifecycle rules run as plain unit tests, and
-the controllers run as `@WebMvcTest` slices with the service mocked.
+Eighty-seven tests. Most need nothing running: the lifecycle rules are plain unit
+tests and the controllers are `@WebMvcTest` slices with the service mocked. The
+exceptions are `WorkspaceScopingTest` and `RowLevelSecurityTest`, which start their own
+PostgreSQL through Testcontainers, so Docker has to be up for those. That is deliberate
+- a workspace leak is a claim about SQL, and a mocked repository returns whatever the
+test told it to. `RowLevelSecurityTest` goes further and connects as the unprivileged
+role rather than through Spring, because Testcontainers hands the application a
+superuser and PostgreSQL exempts superusers from every policy: routed through the usual
+beans it would pass against a database with no policies at all.
+
+```bash
+npm --prefix web test
+```
+
+Thirty-four on the front end, under Vitest: the logic behind the edit form, and the
+sign-out path that used to report a refused sign-out as a success.
 
 ```bash
 npm run automation:test
 ```
 
-Thirty-five more on the Python side. The ten contract tests in that suite check the
+Thirty-seven more on the Python side. The ten contract tests in that suite check the
 models against the live `/v3/api-docs` and skip themselves when the API is not running,
 so run them with `npm run dev:api` up after any backend change.
 
@@ -197,6 +212,8 @@ com/jobtracker/
 resources/db/migration/
   V1__initial_schema.sql            company + job_application
   V4__application_event.sql         the history, plus a backfill
+  V7__workspace_scoping.sql         workspace_id on everything that holds data
+  V8__row_level_security.sql        the policies, and the role they apply to
 ```
 
 | | Path | |
@@ -316,7 +333,7 @@ decisions worth carrying to the next job:
 
 ---
 
-## Next: phase 5 — multi-user
+## Phase 5 — multi-user
 
 Workspaces, Google sign-in, scoped queries and row-level security. It sits here
 rather than at the end because `job_posting` and the Gmail job both get harder to
@@ -324,11 +341,33 @@ retrofit, and because phase 4's events table is what makes a shared workspace
 legible: once two people can move the same application, "who moved this" stops
 being a curiosity and becomes the only way to read the board.
 
-5a-5c are merged: the tenancy tables, `workspace_id` on everything that holds data,
-and Google sign-in with a session cookie. `X-Actor` is gone, replaced in one class
-exactly as `ActorContext` was designed for. Next is 5d, where every query learns to
-say which workspace it means - authentication and scoping are separate problems, so
-until then a signed-in user still sees everything.
+5a-5d are merged: the tenancy tables, `workspace_id` on everything that holds data,
+Google sign-in with a session cookie, and every application query scoped to the caller's
+workspace. `X-Actor` is gone, replaced in one class exactly as `ActorContext` was
+designed for. Reaching for another workspace's application is a 404, never a 403 - a 403
+confirms the row exists, and a caller who can tell "no such id" from "not yours" can map
+every application in the system without reading one.
+
+5e adds row-level security, which is the same rule enforced a layer down. 5d makes the
+scope part of every query, which is correct wherever somebody remembered to write it;
+5e makes an unscoped query impossible, so an endpoint added next year is refused by
+PostgreSQL rather than trusted by it. A `SELECT` with no workspace filter now returns
+nothing rather than everything.
+
+The policies are the small part. **The application no longer connects as the database
+owner**, and that is the part worth carrying forward: PostgreSQL exempts superusers
+unconditionally, and table owners unless the table is `FORCE`d, so policies written
+against the role in `DB_USER` would have been inert while looking finished and passing
+every test. So there are two roles now - `jobtracker` owns the schema and runs Flyway,
+`jobtracker_app` owns nothing and serves requests. `V8` creates the second one, so a
+`npm run db:reset` still needs no extra setup; `.env.example` says what the variables
+are for.
+
+Next is 5f: the Python worker's identity. It currently authenticates with one shared
+key that acts across every workspace - the single most dangerous credential in the
+project - and 5f replaces it with per-job identities and rotation. Phase 8 has its own
+item from this phase: create the application role out of band, rather than letting a
+migration set its password.
 
 Two credentials now matter locally: the Google client from
 [docs/google-oauth-setup.md](docs/google-oauth-setup.md), and a service key for the

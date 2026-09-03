@@ -70,6 +70,14 @@ class WorkspaceScopingTest {
                 () -> "scoping-test-client-id");
         registry.add("spring.security.oauth2.client.registration.google.client-secret",
                 () -> "scoping-test-client-secret");
+
+        // From 5e, migrations run as the schema owner rather than as the
+        // application's role. In production that owner is DB_USER; in a
+        // Testcontainers database it is whatever the container created, so the
+        // defaults in application.yml would authenticate as a role this
+        // PostgreSQL has never heard of.
+        registry.add("spring.flyway.user", POSTGRES::getUsername);
+        registry.add("spring.flyway.password", POSTGRES::getPassword);
     }
 
     /**
