@@ -86,15 +86,19 @@ reason to use it.
 ## 5. Put the credentials where they belong
 
 Google shows a client ID and a client secret. Create `.env` at the repository
-root:
+root — the folder holding `docker-compose.yml`, `api/` and `web/`:
 
 ```
 GOOGLE_CLIENT_ID=...apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=...
 ```
 
-`.env` is already in `.gitignore`. Check that it stays untracked before you
-commit anything:
+Keep them alongside the `DB_*` variables described in `.env.example`. One file,
+one place to look.
+
+`.env` is already in `.gitignore`, and it does not belong to any branch — an
+ignored file is untracked, so git leaves it alone when you switch. Confirm it
+stays that way before committing anything:
 
 ```bash
 git check-ignore -v .env
@@ -102,8 +106,31 @@ git check-ignore -v .env
 
 Nothing should print the secret to a terminal, paste it into a chat, or write it
 into `application.yml`. The client ID is not secret — it is sent to the browser
-on every sign-in — but the secret is a password for your OAuth client, and the
-only place it belongs is that file and, later, the deployment's environment.
+on every sign-in — but the secret is a password for your OAuth client. If it does
+get exposed, the fix is one button: **Credentials → the client → Reset secret**,
+which invalidates the old value immediately.
+
+### The file is not enough on its own
+
+**Spring Boot does not read `.env` files.** Nothing in the framework looks for
+one. `${GOOGLE_CLIENT_ID}` in `application.yml` resolves against real environment
+variables and the usual Spring property sources, and finds nothing if the value
+exists only in a file.
+
+Today that file is read by exactly one thing: **docker compose**, which picks up
+a root `.env` automatically. That is why the `DB_*` variables look like they
+work — Compose reads them, and the API separately falls back to identical
+defaults in `application.yml`. The API is not reading the file.
+
+Phase 5c closes the gap with the `spring-dotenv` dependency, which loads `.env`
+into Spring's `Environment` at startup, so the `${...}` placeholders already used
+throughout `application.yml` keep working unchanged. The alternative — pasting
+the values into IntelliJ's run configuration — also works, but lives in IDE
+settings rather than in the project, so it does not survive a fresh clone and
+nobody else can see what it sets.
+
+Nothing to do about this now. The file and its contents are right; they just
+need one dependency before anything reads them.
 
 ## 6. Tell me it exists
 
