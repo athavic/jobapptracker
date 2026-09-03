@@ -14,6 +14,7 @@ Domain: `pendency.app` (`.com` was being resold for $9,999; `.app` was not).
 | `web/` | React 19 · TypeScript 5 · Vite 8 · Tailwind 4 | **phase 2 — working** |
 | `automation/` | Python 3.14 · httpx · pydantic | **phase 3 — working** |
 | History | `application_event` across all three | **phase 4 — working** |
+| Multi-user | workspaces · Google sign-in · scoped queries | **phase 5 — 5a-5d done** |
 
 Architecture and full build plan: [Pendency Blueprint](https://claude.ai/code/artifact/e244d427-b199-4c28-83c6-b5f85d882342)
 
@@ -111,14 +112,24 @@ their parent and keep holding the ports - so the next `npm run dev` fails with
 npm test
 ```
 
-Thirty-six tests, no database needed: the lifecycle rules run as plain unit tests, and
-the controllers run as `@WebMvcTest` slices with the service mocked.
+Seventy-eight tests. Most need nothing running: the lifecycle rules are plain unit
+tests and the controllers are `@WebMvcTest` slices with the service mocked. The
+exception is `WorkspaceScopingTest`, whose ten cases start their own PostgreSQL through
+Testcontainers, so Docker has to be up for those. That is deliberate - a workspace leak
+is a claim about SQL, and a mocked repository returns whatever the test told it to.
+
+```bash
+npm --prefix web test
+```
+
+Thirty-four on the front end, under Vitest: the logic behind the edit form, and the
+sign-out path that used to report a refused sign-out as a success.
 
 ```bash
 npm run automation:test
 ```
 
-Thirty-five more on the Python side. The ten contract tests in that suite check the
+Thirty-seven more on the Python side. The ten contract tests in that suite check the
 models against the live `/v3/api-docs` and skip themselves when the API is not running,
 so run them with `npm run dev:api` up after any backend change.
 
@@ -324,11 +335,20 @@ retrofit, and because phase 4's events table is what makes a shared workspace
 legible: once two people can move the same application, "who moved this" stops
 being a curiosity and becomes the only way to read the board.
 
-5a-5c are merged: the tenancy tables, `workspace_id` on everything that holds data,
-and Google sign-in with a session cookie. `X-Actor` is gone, replaced in one class
-exactly as `ActorContext` was designed for. Next is 5d, where every query learns to
-say which workspace it means - authentication and scoping are separate problems, so
-until then a signed-in user still sees everything.
+5a-5d are merged: the tenancy tables, `workspace_id` on everything that holds data,
+Google sign-in with a session cookie, and every application query scoped to the caller's
+workspace. `X-Actor` is gone, replaced in one class exactly as `ActorContext` was
+designed for. Reaching for another workspace's application is a 404, never a 403 - a 403
+confirms the row exists, and a caller who can tell "no such id" from "not yours" can map
+every application in the system without reading one.
+
+Next is 5e, row-level security: the same rule enforced a layer down. 5d makes the scope
+part of every query, which is correct wherever someone remembered to write it; 5e makes
+an unscoped query impossible, so the endpoint somebody adds next year is refused by
+PostgreSQL rather than trusted by it. The difficulty is not the policy syntax. It is
+that one caller reads across every workspace on purpose - `readScope()` returns empty
+for the Python worker and nothing else - so the single honest unscoped read has to keep
+working in a database that has just outlawed unscoped reads.
 
 Two credentials now matter locally: the Google client from
 [docs/google-oauth-setup.md](docs/google-oauth-setup.md), and a service key for the
