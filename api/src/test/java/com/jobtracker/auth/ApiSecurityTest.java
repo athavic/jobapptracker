@@ -4,6 +4,7 @@ import com.jobtracker.application.ApplicationController;
 import com.jobtracker.application.ApplicationService;
 import com.jobtracker.common.WebConfig;
 import com.jobtracker.tenancy.SignedInUser;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -27,6 +28,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -124,6 +126,54 @@ class ApiSecurityTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("a read hands the browser a CSRF token, so the first write is not a wasted 403")
+    void csrfTokenIsIssuedBeforeTheFirstWrite() throws Exception {
+        // Spring writes the token cookie only when something actually asks for
+        // the token, and a safe request never does. Left alone that means a
+        // freshly signed-in browser holds no token, its first write is refused,
+        // and the refusal is what finally sets the cookie - so clicking again
+        // works and the bug reads as intermittent.
+        //
+        // The test above this one could not catch that: .with(csrf()) puts a
+        // valid token on the request directly, which is precisely the step the
+        // real browser was missing.
+        Cookie token = mockMvc.perform(get("/api/v1/me").with(signedInUser()))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getCookie("XSRF-TOKEN");
+
+        assertThat(token).isNotNull();
+
+        // The round trip is the real claim: what a read hands out is what a
+        // write is accepted with. 400 from validation, not 403 from security.
+        mockMvc.perform(post("/api/v1/applications")
+                        .with(signedInUser())
+                        .cookie(token)
+                        .header("X-XSRF-TOKEN", token.getValue())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("sign-out succeeds on the first click")
+    void logoutSucceedsWithTheTokenAReadHandedOut() throws Exception {
+        // /logout is a write, so it needs the same token - and it was failing
+        // the same way. The UI reloaded the page regardless of the answer, so a
+        // refused sign-out looked like a page that simply blinked and stayed
+        // signed in.
+        Cookie token = mockMvc.perform(get("/api/v1/me").with(signedInUser()))
+                .andReturn().getResponse().getCookie("XSRF-TOKEN");
+
+        assertThat(token).isNotNull();
+
+        mockMvc.perform(post("/logout")
+                        .with(signedInUser())
+                        .cookie(token)
+                        .header("X-XSRF-TOKEN", token.getValue()))
+                .andExpect(status().isNoContent());
     }
 
     @Test

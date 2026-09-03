@@ -1,6 +1,7 @@
-import type { ReactNode } from 'react'
-import { API_BASE_URL, SIGN_IN_URL } from '../../api/client'
+import { useState, type ReactNode } from 'react'
+import { readCsrfToken, SIGN_IN_URL } from '../../api/client'
 import { ErrorNotice } from '../../components/ErrorNotice'
+import { endSession } from './session'
 import { isSignedOut, useSession, type Session } from './useSession'
 
 /**
@@ -68,15 +69,23 @@ function SignInScreen() {
 }
 
 function SessionBar({ session }: { session: Session }) {
+  const [failed, setFailed] = useState(false)
+
   async function signOut() {
+    setFailed(false)
+
+    if (!(await endSession(readCsrfToken()))) {
+      // Reloading regardless is what hid the CSRF bug for so long: a refused
+      // sign-out looked like a page that blinked and stayed put, so the
+      // obvious response was to click again - which worked, because the
+      // refusal itself was what handed out the missing token.
+      setFailed(true)
+      return
+    }
+
     // A full page load rather than clearing the query cache, because signing
     // out has to leave nothing behind: every cached application, filter and
     // form draft belongs to the person who is leaving.
-    await fetch(`${API_BASE_URL}/logout`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: csrfHeader(),
-    })
     window.location.reload()
   }
 
@@ -86,28 +95,21 @@ function SessionBar({ session }: { session: Session }) {
         <span className="text-xs text-ink-soft">
           Signed in as {session.displayName || session.email}
         </span>
-        <button
-          type="button"
-          onClick={signOut}
-          className="text-xs text-ink-soft underline underline-offset-2 transition hover:text-ink"
-        >
-          Sign out
-        </button>
+        <div className="flex items-center gap-3">
+          {failed && (
+            <span role="alert" className="text-xs text-danger-ink">
+              Could not sign out. Try again.
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={signOut}
+            className="text-xs text-ink-soft underline underline-offset-2 transition hover:text-ink"
+          >
+            Sign out
+          </button>
+        </div>
       </div>
     </div>
   )
-}
-
-/**
- * The CSRF token, for the one write that does not go through the typed client.
- * /logout is Spring Security's own endpoint, so it is not in the OpenAPI
- * document and openapi-fetch has no route for it.
- */
-function csrfHeader(): Record<string, string> {
-  const token = document.cookie
-    .split('; ')
-    .find((entry) => entry.startsWith('XSRF-TOKEN='))
-    ?.slice('XSRF-TOKEN='.length)
-
-  return token ? { 'X-XSRF-TOKEN': token } : {}
 }
