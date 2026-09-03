@@ -91,7 +91,15 @@ spring:
     # future backfill: V8's policies do not apply to the owner, so a migration
     # can still see every row in every workspace. This is the same split the
     # header of V8 describes - owner migrates, app role serves requests.
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:jobtracker}
+    #
+    # user without url on purpose. Setting a url here would build Flyway a
+    # DataSource of its own, which would then ignore the connection anything
+    # else supplied - Testcontainers' @ServiceConnection included, so the test
+    # suite would migrate whatever DB_HOST happened to point at. That is the
+    # developer's real database. With only the credentials set, Boot derives
+    # Flyway's DataSource FROM the application's, keeping the URL and swapping
+    # the role, which is exactly the intent and survives being pointed
+    # somewhere else.
     user: ${DB_USER:jobtracker}
     password: ${DB_PASSWORD:jobtracker}
     placeholders:

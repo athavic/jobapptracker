@@ -112,11 +112,15 @@ their parent and keep holding the ports - so the next `npm run dev` fails with
 npm test
 ```
 
-Seventy-eight tests. Most need nothing running: the lifecycle rules are plain unit
+Eighty-seven tests. Most need nothing running: the lifecycle rules are plain unit
 tests and the controllers are `@WebMvcTest` slices with the service mocked. The
-exception is `WorkspaceScopingTest`, whose ten cases start their own PostgreSQL through
-Testcontainers, so Docker has to be up for those. That is deliberate - a workspace leak
-is a claim about SQL, and a mocked repository returns whatever the test told it to.
+exceptions are `WorkspaceScopingTest` and `RowLevelSecurityTest`, which start their own
+PostgreSQL through Testcontainers, so Docker has to be up for those. That is deliberate
+- a workspace leak is a claim about SQL, and a mocked repository returns whatever the
+test told it to. `RowLevelSecurityTest` goes further and connects as the unprivileged
+role rather than through Spring, because Testcontainers hands the application a
+superuser and PostgreSQL exempts superusers from every policy: routed through the usual
+beans it would pass against a database with no policies at all.
 
 ```bash
 npm --prefix web test
