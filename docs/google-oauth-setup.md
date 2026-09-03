@@ -18,41 +18,78 @@ billing account required; nothing here costs anything.
 
 ## 2. Configure the consent screen
 
-**APIs & Services → OAuth consent screen**
+**APIs & Services → OAuth consent screen**, which recent consoles present as
+**Google Auth Platform**, split into *Branding*, *Audience*, *Clients* and
+*Data Access*. The settings are the same; only the page they live on moved.
 
 | Field | Value | Why |
 |---|---|---|
-| User type | **External** | "Internal" only exists if you have a Google Workspace organisation. External is correct for a personal Gmail account. |
-| App name | `Job Tracker` | Shown on the sign-in screen. |
+| User type / Audience | **External** | "Internal" only exists with a Google Workspace organisation. External is correct for a personal Gmail account. |
+| App name | shown on the sign-in screen | |
 | User support email | your address | Required. |
 | Developer contact | your address | Required. |
 
-**Leave the publishing status as "Testing."** A Testing app needs no
-verification review, and you add yourself under **Test users** to be allowed in.
-The limit is 100 users, which is 99 more than this app currently needs.
+**Leave the publishing status as "Testing."** It needs no verification review.
 
-One consequence worth knowing: in Testing, Google expires refresh tokens after
-7 days. That would matter if the app kept long-lived offline access. It does not
-— 5c uses a server-side session cookie, so a sign-in lasts as long as the
-session and re-authenticating is a redirect, not an outage.
+### Testing does not restrict who can sign in here
 
-## 3. Scopes: ask for three, and only three
+This is the part that surprises people, and it is documented behaviour rather
+than a misconfiguration. Google's Testing rules - trusted-user list, warning
+screen, authorizations expiring after seven days - have an explicit exception:
 
-**Add or remove scopes** → select:
+> The only exception to this behavior is if your app requests a subset of the
+> following: name, email address, and user profile (through the
+> `userinfo.email`, `userinfo.profile`, `openid` scopes or their OpenID Connect
+> equivalents). For such requests, your users do not need to be in the trusted
+> user list, they will not see a warning message, and their authorizations will
+> not expire after 7 days. If your app uses Sign in with Google to authenticate
+> users then this exception also applies.
+
+That is exactly this app's scope set. So:
+
+- **Adding test users changes nothing while the scopes stay as they are.** Any
+  Google account can complete the sign-in. This was observed directly: four
+  accounts signed in with one test user configured, and Google counted two,
+  because the other two never consumed test-user quota.
+- **No seven-day expiry**, and no unverified-app warning screen.
+- **Phase 7 ends the exception.** `gmail.readonly` is a restricted scope, and
+  requesting anything beyond the three above means the trusted-user list starts
+  being enforced, the warning screen appears, and authorizations begin expiring
+  after a week. Plan for that when Gmail ingestion arrives; it is a change in
+  behaviour, not just a new permission.
+
+**The consequence worth internalising: Google's consent screen is not this
+application's access control, and cannot be made into it.** Anyone who can
+authenticate gets an `app_user` row and a workspace of their own. What protects
+your applications is workspace scoping - phase 5d - and membership. If you want
+sign-up itself to be closed, that is a deliberate feature (an allowlist, or
+invite-only registration against `workspace_invite`), not a console setting.
+
+## 3. Scopes: three, and you may not have to touch this at all
+
+The app needs exactly:
 
 - `openid`
 - `.../auth/userinfo.email`
 - `.../auth/userinfo.profile`
 
-These are the non-sensitive scopes. They give exactly what V6's `app_user` table
-is designed around: the `sub` claim (the permanent account identifier), the
-email address, and a display name plus avatar.
+These give what V6's `app_user` table is designed around: the `sub` claim (the
+permanent account identifier), the email address, and a display name plus avatar.
 
-**Do not add any Gmail scope yet.** Phase 7 reads application confirmation
-emails, and `gmail.readonly` is a *restricted* scope — requesting it pushes the
-app into Google's verification process, including a possible security
-assessment. That is a phase 7 problem, and adding it early would mean doing that
-review before you can sign in at all.
+**You do not have to declare them anywhere for sign-in to work.** Scopes are
+requested by the application, at sign-in, in the authorization request - in this
+codebase that is `spring.security.oauth2.client.registration.google.scope`. All
+three are non-sensitive, and Google grants non-sensitive scopes without their
+being pre-registered. An app using only non-sensitive scopes is also exempt from
+verification.
+
+If you want the consent screen to list them explicitly, they go under **Data
+Access** (older consoles: *Add or remove scopes* on the consent screen). That is
+a separate page from client creation, which is why it is easy to finish setup
+without ever seeing it. Nothing is broken if you skipped it.
+
+**Do not add any Gmail scope yet.** Beyond the verification cost, it flips the
+Testing behaviour described above.
 
 ## 4. Create the client
 
@@ -172,9 +209,10 @@ The first person to sign in adopts the workspace the V7 migration created — th
 one holding every application that existed before there were users. Everyone
 after that gets a workspace of their own.
 
-If it fails, the two usual causes are both in this document: an account that is
-not on the **Test users** list, and a redirect URI that does not match character
-for character.
+If it fails, the usual cause is a redirect URI that does not match character for
+character — a trailing slash, `https` instead of `http`, or `127.0.0.1` instead
+of `localhost` all produce `redirect_uri_mismatch`. The test-user list is *not*
+a likely cause here; see section 2 for why it does not gate this scope set.
 
 ---
 
@@ -183,4 +221,7 @@ for character.
 - **Phase 8 (deploy)** adds a second redirect URI for the real hostname. Add it
   alongside the localhost one — a client can hold several, so local development
   keeps working.
-- **Phase 7 (Gmail)** is where the restricted scope and its review arrive.
+- **Phase 7 (Gmail)** is where the restricted scope arrives, bringing its
+  verification review *and* an end to the Testing exception in section 2 — the
+  trusted-user list starts being enforced, the unverified-app warning appears,
+  and authorizations begin expiring after seven days.
