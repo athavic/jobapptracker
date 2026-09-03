@@ -18,41 +18,59 @@ billing account required; nothing here costs anything.
 
 ## 2. Configure the consent screen
 
-**APIs & Services → OAuth consent screen**
+**APIs & Services → OAuth consent screen**, which recent consoles present as
+**Google Auth Platform**, split into *Branding*, *Audience*, *Clients* and
+*Data Access*. The settings below are the same either way; only the page they
+live on has moved.
 
 | Field | Value | Why |
 |---|---|---|
-| User type | **External** | "Internal" only exists if you have a Google Workspace organisation. External is correct for a personal Gmail account. |
+| User type / Audience | **External** | "Internal" only exists if you have a Google Workspace organisation. External is correct for a personal Gmail account. |
 | App name | `Job Tracker` | Shown on the sign-in screen. |
 | User support email | your address | Required. |
 | Developer contact | your address | Required. |
 
-**Leave the publishing status as "Testing."** A Testing app needs no
-verification review, and you add yourself under **Test users** to be allowed in.
-The limit is 100 users, which is 99 more than this app currently needs.
+**Leave the publishing status as "Testing."** A Testing app needs no verification
+review. The limit is 100 users, which is 99 more than this app currently needs.
+
+> **This part is not optional.** While the app is in Testing, add your own Google
+> account under **Test users** (in the newer console: *Audience → Test users*).
+> An account that is not on that list cannot sign in, and the failure is a
+> generic "app is blocked" rather than anything that explains itself.
 
 One consequence worth knowing: in Testing, Google expires refresh tokens after
 7 days. That would matter if the app kept long-lived offline access. It does not
 — 5c uses a server-side session cookie, so a sign-in lasts as long as the
 session and re-authenticating is a redirect, not an outage.
 
-## 3. Scopes: ask for three, and only three
+## 3. Scopes: three, and you may not have to touch this at all
 
-**Add or remove scopes** → select:
+The app needs exactly:
 
 - `openid`
 - `.../auth/userinfo.email`
 - `.../auth/userinfo.profile`
 
-These are the non-sensitive scopes. They give exactly what V6's `app_user` table
-is designed around: the `sub` claim (the permanent account identifier), the
-email address, and a display name plus avatar.
+These give what V6's `app_user` table is designed around: the `sub` claim (the
+permanent account identifier), the email address, and a display name plus avatar.
+
+**You do not have to declare them anywhere to make sign-in work.** Scopes are
+requested by the application, at sign-in, in the authorization request — in 5c
+that is `spring.security.oauth2.client.registration.google.scope`. All three are
+*non-sensitive*, and Google grants non-sensitive scopes without their being
+pre-registered. An app using only non-sensitive scopes is also not required to
+complete verification.
+
+If you want the consent screen to list them explicitly, they go under **Data
+Access** (older consoles: *Add or remove scopes* on the consent screen). That is
+a separate page from client creation, which is why it is easy to finish setup
+without ever seeing it. Nothing is broken if you skipped it.
 
 **Do not add any Gmail scope yet.** Phase 7 reads application confirmation
 emails, and `gmail.readonly` is a *restricted* scope — requesting it pushes the
 app into Google's verification process, including a possible security
-assessment. That is a phase 7 problem, and adding it early would mean doing that
-review before you can sign in at all.
+assessment. That is a phase 7 problem, and adding it early would mean passing
+that review before being able to sign in at all.
 
 ## 4. Create the client
 
