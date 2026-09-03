@@ -111,6 +111,19 @@ jobs:
       DB_HOST: localhost
       DB_PORT: 5432
 
+      # From 5c the API refuses anonymous requests, so both sides of this job
+      # need the same key: the server to accept it, pytest to send it. A CI-only
+      # value, generated per run rather than stored - nothing here is reachable
+      # from outside the runner.
+      AUTOMATION_SERVICE_KEY: contract-test-key-${{ github.run_id }}
+      JOBTRACKER_SERVICE_KEY: contract-test-key-${{ github.run_id }}
+
+      # The app will not start without a client registration, and this job never
+      # signs anyone in - it authenticates with the service key. Placeholders are
+      # enough to build the registration; they are never exchanged with Google.
+      GOOGLE_CLIENT_ID: contract-test-client-id
+      GOOGLE_CLIENT_SECRET: contract-test-client-secret
+
     steps:
       - uses: actions/checkout@v4
 
@@ -135,10 +148,14 @@ jobs:
 
       # Poll the endpoint the tests actually read. Flyway has to migrate an
       # empty database first, so this takes a few seconds.
+      # The service key header is not incidental: without the dev profile the
+      # document requires a principal, so an unauthenticated poll would loop
+      # until it timed out. Polling the way the tests will also proves the key
+      # reached the server before any test blames the models for a 401.
       - name: Wait for /v3/api-docs
         run: |
           for i in $(seq 1 60); do
-            if curl -fsS http://localhost:8080/v3/api-docs > /dev/null; then
+            if curl -fsS -H "X-Service-Key: $AUTOMATION_SERVICE_KEY"                  http://localhost:8080/v3/api-docs > /dev/null; then
               echo "API is up after ${i}s"; exit 0
             fi
             sleep 1

@@ -23,10 +23,25 @@ NOW = datetime(2026, 8, 30, 12, 0, tzinfo=UTC)
 ACTIVE_NEXT = ["SCREEN", "INTERVIEW", "OFFER", "REJECTED", "GHOSTED", "WITHDRAWN"]
 
 
+@pytest.fixture(autouse=True)
+def service_key_in_environment(monkeypatch):
+    """Every test runs as if a key were configured.
+
+    The CLI builds its own Settings from the environment, so without this the
+    tests that exercise main() would all fail at construction on the missing
+    credential rather than on whatever they were written to check. The test that
+    cares about the missing case clears it deliberately.
+    """
+    monkeypatch.setenv("JOBTRACKER_SERVICE_KEY", "test-service-key")
+
+
 @pytest.fixture
 def settings() -> Settings:
     return Settings(
         api_base_url="http://api.test",
+        # Any value; what matters is that the client sends it. A blank one is
+        # refused at construction, which is itself asserted in test_client.
+        service_key="test-service-key",
         stale_after_days=14,
         ghost_after_days=45,
         page_size=2,

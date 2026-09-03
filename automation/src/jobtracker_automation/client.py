@@ -30,6 +30,15 @@ from .models import (
 log = logging.getLogger(__name__)
 
 
+class MissingServiceKey(RuntimeError):
+    """No credential configured, so no request could ever succeed.
+
+    Raised at construction rather than on the first call: a job that fails
+    immediately with one readable sentence is easier to fix than one that starts
+    a run, records it, and then fails every request inside it.
+    """
+
+
 class ApiError(RuntimeError):
     """A request the API refused.
 
@@ -98,17 +107,34 @@ class JobTrackerClient:
             transport=httpx.HTTPTransport(retries=2),
         )
 
-        # Every write this client makes is stamped as a bot, and named.
+        # How this worker gets in at all, from phase 5c on.
         #
-        # Without this the API sees no X-Actor and records the job's writes as
-        # HUMAN - and an application this worker ghosted would be indistinguishable
-        # from one you ghosted yourself, which is the exact question the events
-        # table was added to answer. Set on the session rather than per call so a
-        # new endpoint cannot be added without it.
+        # The API requires a principal on every request. This one has no browser
+        # and therefore no session, so it presents a shared key instead - see
+        # ServiceKeyAuthenticationFilter. Missing key means every call comes back
+        # 401, which is why the absence is raised here with a sentence rather
+        # than discovered as a wall of authentication errors mid-run.
+        if not settings.service_key:
+            raise MissingServiceKey(
+                "JOBTRACKER_SERVICE_KEY is not set. The API requires it for every "
+                "request; it must match app.automation.service-key on the server "
+                "(AUTOMATION_SERVICE_KEY in the repository root .env)."
+            )
+        self._http.headers["X-Service-Key"] = settings.service_key
+
+        # Which job, when there is one.
         #
-        # Applied to an injected client too: a test that passes its own
-        # httpx.Client should exercise the same headers production sends.
-        self._http.headers["X-Actor"] = "AUTOMATION"
+        # X-Actor is deliberately gone. Until 5c the worker declared itself a bot
+        # with that header and the API believed it - which meant a browser could
+        # equally declare itself a bot, and the one column whose whole job is
+        # provenance recorded whatever the caller preferred. AUTOMATION is now
+        # inferred from the fact that this request authenticated with the service
+        # key, which the caller cannot fake. Only the job name still has to be
+        # told, because only the worker knows it.
+        #
+        # Set on the session rather than per call, so a new endpoint cannot be
+        # added without it - and applied to an injected client too, so a test
+        # that passes its own httpx.Client exercises what production sends.
         if job_name:
             self._http.headers["X-Actor-Detail"] = job_name
 

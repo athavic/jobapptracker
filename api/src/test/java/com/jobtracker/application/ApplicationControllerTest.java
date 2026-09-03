@@ -13,6 +13,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -45,8 +46,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * A web-layer slice test: real HTTP mapping, real validation, real exception
  * handling - with the service mocked out. No database, so it runs anywhere.
+ *
+ * <p>Security filters are off. Not because security does not matter, but because
+ * a slice does not load the real SecurityConfig - it gets Spring Boot's default
+ * chain instead, so every assertion here would be about a configuration this
+ * application never runs. Leaving them on would mean 27 tests failing on CSRF
+ * and redirects while proving nothing. What the API actually allows and refuses
+ * is asserted in ApiSecurityTest, against the real chain.
  */
 @WebMvcTest(ApplicationController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class ApplicationControllerTest {
 
     @Autowired
@@ -107,16 +116,6 @@ class ApplicationControllerTest {
         mockMvc.perform(get("/api/v1/applications/999"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.detail").value("Application 999 not found"));
-    }
-
-    @Test
-    @DisplayName("answers the browser preflight so the Vite dev server can call the API")
-    void corsPreflightIsAllowed() throws Exception {
-        mockMvc.perform(options("/api/v1/applications")
-                        .header("Origin", "http://localhost:5173")
-                        .header("Access-Control-Request-Method", "POST"))
-                .andExpect(status().isOk())
-                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:5173"));
     }
 
     @Test

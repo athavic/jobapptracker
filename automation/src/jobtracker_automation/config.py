@@ -33,6 +33,16 @@ class Settings(BaseSettings):
 
     timeout_seconds: float = Field(default=10.0, gt=0)
 
+    #: Shared secret the API requires on every request from phase 5c on. No
+    #: default, because a default would be a credential in source control and a
+    #: worker that appears configured while being unable to authenticate. Must
+    #: match app.automation.service-key on the server side, which reads it from
+    #: AUTOMATION_SERVICE_KEY in the repository root .env.
+    #:
+    #: This key acts across every workspace, so it is the one value in this
+    #: project that must never reach a browser.
+    service_key: str | None = Field(default=None)
+
     #: Rows per page when walking a list endpoint. Large enough that a few
     #: hundred applications is one or two requests, small enough that a slow
     #: response never holds a huge result set in memory on either side.

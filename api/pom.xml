@@ -36,6 +36,14 @@
       <artifactId>spring-boot-starter-validation</artifactId>
     </dependency>
 
+    <!-- Phase 5c: Google sign-in. Pulls in spring-boot-starter-security, which
+         is what actually locks the API down - the oauth2-client half only adds
+         the authorization-code flow on top of it. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-oauth2-client</artifactId>
+    </dependency>
+
     <!-- Flyway 10+ needs the core engine AND the per-database module -->
     <dependency>
       <groupId>org.flywaydb</groupId>
@@ -75,6 +83,14 @@
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- The request post-processors and @WithMockUser support the controller
+         slices need now that every endpoint requires a principal. -->
+    <dependency>
+      <groupId>org.springframework.security</groupId>
+      <artifactId>spring-security-test</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>
