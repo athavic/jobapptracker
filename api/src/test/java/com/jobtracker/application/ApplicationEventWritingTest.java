@@ -4,6 +4,7 @@ import com.jobtracker.application.dto.ChangeStatusRequest;
 import com.jobtracker.application.dto.CreateApplicationRequest;
 import com.jobtracker.common.Actor;
 import com.jobtracker.common.ActorContext;
+import com.jobtracker.common.WorkspaceContext;
 import com.jobtracker.company.Company;
 import com.jobtracker.company.CompanyRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,19 +43,26 @@ class ApplicationEventWritingTest {
     private ApplicationEventRepository events;
     @Mock
     private ActorContext actorContext;
+    @Mock
+    private WorkspaceContext workspaceContext;
+
+    /** Any id will do; what matters is that the same one comes out the far end. */
+    private static final Long WORKSPACE = 7L;
 
     private ApplicationService service;
 
     @BeforeEach
     void setUp() {
-        service = new ApplicationService(applications, companies, events, actorContext);
+        service = new ApplicationService(applications, companies, events, actorContext, workspaceContext);
     }
 
     @Test
     @DisplayName("creating an application records a CREATED event at its initial status")
     void createRecordsCreatedEvent() {
         given(actorContext.current()).willReturn(Actor.HUMAN);
-        given(companies.findByNameIgnoreCase("Stripe")).willReturn(Optional.of(new Company("Stripe")));
+        given(workspaceContext.currentId()).willReturn(WORKSPACE);
+        given(companies.findByWorkspaceIdAndNameIgnoreCase(WORKSPACE, "Stripe"))
+                .willReturn(Optional.of(new Company(WORKSPACE, "Stripe")));
         given(applications.save(any())).willAnswer(call -> call.getArgument(0));
 
         service.create(new CreateApplicationRequest(
@@ -124,9 +132,55 @@ class ApplicationEventWritingTest {
         verify(events).save(any());   // still exactly one, from the first call
     }
 
+    @Test
+    @DisplayName("a created application and its event both land in the current workspace")
+    void createStampsTheWorkspaceOntoBothRows() {
+        given(actorContext.current()).willReturn(Actor.HUMAN);
+        given(workspaceContext.currentId()).willReturn(WORKSPACE);
+        given(companies.findByWorkspaceIdAndNameIgnoreCase(WORKSPACE, "Stripe"))
+                .willReturn(Optional.of(new Company(WORKSPACE, "Stripe")));
+        given(applications.save(any())).willAnswer(call -> call.getArgument(0));
+
+        service.create(new CreateApplicationRequest(
+                "Stripe", "Backend Engineer", ApplicationStatus.SAVED,
+                null, null, null, null, null, null, null, null, null, null, null, null));
+
+        ArgumentCaptor<JobApplication> saved = ArgumentCaptor.forClass(JobApplication.class);
+        verify(applications).save(saved.capture());
+
+        // Nothing passes the workspace to either of these. The application takes
+        // it from the company and the event from the application, so this asserts
+        // the chain rather than three separate assignments.
+        assertThat(saved.getValue().getWorkspaceId()).isEqualTo(WORKSPACE);
+        assertThat(captureEvent().getWorkspaceId()).isEqualTo(WORKSPACE);
+    }
+
+    @Test
+    @DisplayName("a company invented for an unknown name is created inside the current workspace")
+    void newCompanyBelongsToTheCurrentWorkspace() {
+        given(actorContext.current()).willReturn(Actor.HUMAN);
+        given(workspaceContext.currentId()).willReturn(WORKSPACE);
+        given(companies.findByWorkspaceIdAndNameIgnoreCase(WORKSPACE, "Figma"))
+                .willReturn(Optional.empty());
+        given(companies.save(any())).willAnswer(call -> call.getArgument(0));
+        given(applications.save(any())).willAnswer(call -> call.getArgument(0));
+
+        service.create(new CreateApplicationRequest(
+                "Figma", "Design Engineer", ApplicationStatus.SAVED,
+                null, null, null, null, null, null, null, null, null, null, null, null));
+
+        ArgumentCaptor<Company> saved = ArgumentCaptor.forClass(Company.class);
+        verify(companies).save(saved.capture());
+
+        // The workspace_id column is NOT NULL from V7 on, so a company built
+        // without one does not fail here - it fails at flush, in whichever
+        // request happened to name a company nobody had used before.
+        assertThat(saved.getValue().getWorkspaceId()).isEqualTo(WORKSPACE);
+    }
+
     private JobApplication givenApplicationExists(ApplicationStatus status) {
         JobApplication application =
-                new JobApplication(new Company("Stripe"), "Backend Engineer", status);
+                new JobApplication(new Company(WORKSPACE, "Stripe"), "Backend Engineer", status);
         given(applications.findWithCompanyById(1L)).willReturn(Optional.of(application));
         return application;
     }

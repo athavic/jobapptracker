@@ -46,6 +46,18 @@ public class ApplicationEvent {
     @JoinColumn(name = "application_id", nullable = false, updatable = false)
     private JobApplication application;
 
+    /**
+     * Copied from the application, for the same reason JobApplication copies it
+     * from the company: an event about an application in another workspace is
+     * not a thing that can meaningfully exist.
+     *
+     * <p>Stored rather than reached through application_id because phase 5e
+     * writes row-level security policies against this table, and a policy that
+     * has to join to find its tenant is both slower and easier to get wrong.
+     */
+    @Column(name = "workspace_id", nullable = false, updatable = false)
+    private Long workspaceId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32, updatable = false)
     private ApplicationEventType type;
@@ -86,6 +98,7 @@ public class ApplicationEvent {
                              String actorDetail,
                              String note) {
         this.application = application;
+        this.workspaceId = application.getWorkspaceId();
         this.type = type;
         this.fromStatus = fromStatus;
         this.toStatus = toStatus;
@@ -126,6 +139,10 @@ public class ApplicationEvent {
 
     public JobApplication getApplication() {
         return application;
+    }
+
+    public Long getWorkspaceId() {
+        return workspaceId;
     }
 
     public ApplicationEventType getType() {

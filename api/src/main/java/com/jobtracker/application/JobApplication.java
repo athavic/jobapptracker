@@ -35,6 +35,19 @@ public class JobApplication {
     @JoinColumn(name = "company_id", nullable = false)
     private Company company;
 
+    /**
+     * The tenant, copied from the company rather than passed in.
+     *
+     * <p>Deriving it is what makes the two impossible to disagree. An
+     * application and its company are joined on every read, so an application
+     * filed under one workspace whose company sits in another is not a wrong
+     * answer, it is a row that vanishes from both. The service resolves the
+     * company within the current workspace already, so the tenant is decided in
+     * exactly one place and everything downstream inherits it.
+     */
+    @Column(name = "workspace_id", nullable = false, updatable = false)
+    private Long workspaceId;
+
     @Column(name = "role_title", nullable = false, length = 250)
     private String roleTitle;
 
@@ -119,12 +132,17 @@ public class JobApplication {
 
     public JobApplication(Company company, String roleTitle, ApplicationStatus status) {
         this.company = company;
+        this.workspaceId = company.getWorkspaceId();
         this.roleTitle = roleTitle;
         this.status = status;
     }
 
     public Long getId() {
         return id;
+    }
+
+    public Long getWorkspaceId() {
+        return workspaceId;
     }
 
     public Company getCompany() {
