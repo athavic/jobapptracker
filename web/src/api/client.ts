@@ -40,6 +40,20 @@ function readCookie(name: string): string | undefined {
 }
 
 /**
+ * The token to echo on a write, or undefined if the server has not issued one.
+ *
+ * Exported for the one write that does not go through this client: /logout is
+ * Spring Security's own endpoint, so it is absent from the OpenAPI document and
+ * openapi-fetch has no route for it. A second copy of this lookup living over
+ * there is how the two quietly drift apart.
+ */
+export function readCsrfToken(): string | undefined {
+  return readCookie(CSRF_COOKIE)
+}
+
+export { CSRF_HEADER }
+
+/**
  * Echoes the CSRF token back on every write.
  *
  * Spring writes the token into a cookie this script can read, and expects it
