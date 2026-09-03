@@ -16,6 +16,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.web.cors.CorsConfigurationSource;
 
@@ -131,6 +132,11 @@ class SecurityConfig {
                     // the origin list above refuses.
                     .ignoringRequestMatchers(request ->
                             request.getHeader(ServiceKeyAuthenticationFilter.SERVICE_KEY_HEADER) != null))
+
+            // Without this the token is never written, because nothing on the
+            // server side ever reads it - see CsrfCookieFilter. After
+            // CsrfFilter, which is what puts the token on the request.
+            .addFilterAfter(new CsrfCookieFilter(), CsrfFilter.class)
 
             .addFilterBefore(new ServiceKeyAuthenticationFilter(serviceKey),
                     UsernamePasswordAuthenticationFilter.class);
