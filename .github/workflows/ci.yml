@@ -29,8 +29,12 @@ jobs:
           # Caches ~/.m2 keyed on pom.xml. Saves ~40s a run.
           cache: maven
 
-      # The API tests are @WebMvcTest slices and plain unit tests - no database,
-      # so no service container needed here.
+      # Mostly @WebMvcTest slices and plain unit tests. The exception is
+      # WorkspaceScopingTest, which starts its own PostgreSQL through
+      # Testcontainers - a workspace leak is a claim about SQL, and neither a
+      # mocked repository nor an in-memory database can refute it. No service
+      # container here because Testcontainers manages its own, using the Docker
+      # the runner already provides.
       - run: mvn -B -f api/pom.xml verify
 
   web:

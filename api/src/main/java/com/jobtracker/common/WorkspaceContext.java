@@ -1,5 +1,7 @@
 package com.jobtracker.common;
 
+import java.util.Optional;
+
 /**
  * Answers "which workspace does this request belong to?".
  *
@@ -18,4 +20,18 @@ public interface WorkspaceContext {
 
     /** Never null. The workspace new rows are written into. */
     Long currentId();
+
+    /**
+     * The workspace a request may READ, or empty to read across all of them.
+     *
+     * <p>Separate from {@link #currentId()} because the two questions have
+     * different answers for the Python worker: it has no workspace to write
+     * into, and nudge_stale legitimately scans every one of them.
+     *
+     * <p>An Optional rather than a nullable Long, and that is the whole design.
+     * Empty means "no filter", which is the most dangerous value in this
+     * codebase - it has exactly one correct caller. Making it a value the reader
+     * has to unwrap is what stops it being reached by a forgotten null check.
+     */
+    Optional<Long> readScope();
 }

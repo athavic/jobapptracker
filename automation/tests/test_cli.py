@@ -75,8 +75,14 @@ def test_a_missing_service_key_exits_two_without_a_traceback(monkeypatch, caplog
     Exit 2 rather than 1 so a scheduler can tell "you have not set this up" from
     "the API said no" - the first needs a human, the second may fix itself on
     the next run.
+
+    Set to empty rather than deleted. Deleting the variable only unsets one of
+    the two places Settings looks: a developer with a real automation/.env would
+    still get a key from the file, and this test would quietly start asserting
+    nothing. An environment variable outranks .env, so empty wins everywhere -
+    and empty is what the server treats as unconfigured too.
     """
-    monkeypatch.delenv("JOBTRACKER_SERVICE_KEY", raising=False)
+    monkeypatch.setenv("JOBTRACKER_SERVICE_KEY", "")
 
     assert main(ARGS) == 2
     assert "JOBTRACKER_SERVICE_KEY" in caplog.text

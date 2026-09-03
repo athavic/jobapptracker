@@ -7,11 +7,13 @@ import com.jobtracker.common.ActorContext;
 import com.jobtracker.common.WorkspaceContext;
 import com.jobtracker.company.Company;
 import com.jobtracker.company.CompanyRepository;
+import org.springframework.data.jpa.domain.Specification;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -178,10 +180,19 @@ class ApplicationEventWritingTest {
         assertThat(saved.getValue().getWorkspaceId()).isEqualTo(WORKSPACE);
     }
 
+    /**
+     * Stubs the scoped lookup rather than a find-by-id, because since 5d there
+     * is no find-by-id: every read goes through a Specification carrying the
+     * workspace. What that Specification contains is asserted in
+     * WorkspaceScopingTest, against a real database, where it can actually be
+     * checked - here it is only in the way.
+     */
     private JobApplication givenApplicationExists(ApplicationStatus status) {
         JobApplication application =
                 new JobApplication(new Company(WORKSPACE, "Stripe"), "Backend Engineer", status);
-        given(applications.findWithCompanyById(1L)).willReturn(Optional.of(application));
+        given(workspaceContext.readScope()).willReturn(Optional.of(WORKSPACE));
+        given(applications.findOne(ArgumentMatchers.<Specification<JobApplication>>any()))
+                .willReturn(Optional.of(application));
         return application;
     }
 
