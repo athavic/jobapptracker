@@ -11,6 +11,7 @@ import com.jobtracker.common.BusinessRuleException;
 import com.jobtracker.common.ActorContext;
 import com.jobtracker.common.InvalidStatusTransitionException;
 import com.jobtracker.common.NotFoundException;
+import com.jobtracker.common.WorkspaceContext;
 import com.jobtracker.company.Company;
 import com.jobtracker.company.CompanyRepository;
 import org.springframework.data.domain.Page;
@@ -35,15 +36,18 @@ public class ApplicationService {
     private final CompanyRepository companies;
     private final ApplicationEventRepository events;
     private final ActorContext actorContext;
+    private final WorkspaceContext workspaceContext;
 
     public ApplicationService(JobApplicationRepository applications,
                               CompanyRepository companies,
                               ApplicationEventRepository events,
-                              ActorContext actorContext) {
+                              ActorContext actorContext,
+                              WorkspaceContext workspaceContext) {
         this.applications = applications;
         this.companies = companies;
         this.events = events;
         this.actorContext = actorContext;
+        this.workspaceContext = workspaceContext;
     }
 
     @Transactional
@@ -279,10 +283,17 @@ public class ApplicationService {
                 .orElseThrow(() -> new NotFoundException("Application", id));
     }
 
+    /**
+     * The one place a workspace is chosen. Everything else inherits it - the
+     * application takes it from the company, the event from the application - so
+     * there is a single line to change in 5c when the answer starts coming from
+     * an authenticated principal instead of configuration.
+     */
     private Company findOrCreateCompany(String rawName) {
         String name = rawName.trim();
-        return companies.findByNameIgnoreCase(name)
-                .orElseGet(() -> companies.save(new Company(name)));
+        Long workspaceId = workspaceContext.currentId();
+        return companies.findByWorkspaceIdAndNameIgnoreCase(workspaceId, name)
+                .orElseGet(() -> companies.save(new Company(workspaceId, name)));
     }
 
     private static String normalizeCurrency(String currency) {

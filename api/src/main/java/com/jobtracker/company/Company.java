@@ -19,7 +19,24 @@ public class Company {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 200)
+    /**
+     * The tenant this row belongs to.
+     *
+     * <p>A plain id, not a @ManyToOne to a Workspace entity. Nothing here needs
+     * a workspace object - the column exists to be filtered on, and phase 5e
+     * filters it in SQL policies that never see Java at all. Mapping the
+     * association would add a table to the object graph purely so it could be
+     * ignored.
+     */
+    @Column(name = "workspace_id", nullable = false, updatable = false)
+    private Long workspaceId;
+
+    /**
+     * No longer globally unique: two workspaces both tracking Stripe is normal.
+     * Uniqueness is now (workspace_id, lower(name)), which cannot be expressed
+     * as a column annotation - see uq_company_workspace_name in V7.
+     */
+    @Column(nullable = false, length = 200)
     private String name;
 
     @Column(length = 500)
@@ -43,12 +60,17 @@ public class Company {
     protected Company() {
     }
 
-    public Company(String name) {
+    public Company(Long workspaceId, String name) {
+        this.workspaceId = workspaceId;
         this.name = name;
     }
 
     public Long getId() {
         return id;
+    }
+
+    public Long getWorkspaceId() {
+        return workspaceId;
     }
 
     public String getName() {

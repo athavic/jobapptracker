@@ -39,8 +39,21 @@ spring:
 server:
   port: ${SERVER_PORT:8080}
 
-# Origins allowed to call this API from a browser. The Vite dev server runs on 5173.
 app:
+  tenancy:
+    # PLACEHOLDER, removed in phase 5c.
+    #
+    # V7 makes workspace_id NOT NULL on every table that holds your data, and
+    # until Google sign-in exists there is no principal to ask which workspace a
+    # request belongs to. So the API names one. This is the workspace V7 inserts
+    # for the backfill, with its id written explicitly in the migration so this
+    # value is a documented constant rather than a bet on where a sequence starts.
+    #
+    # See FixedWorkspaceContext, which is the class this configures and the class
+    # that should not survive 5c.
+    bootstrap-workspace-id: ${BOOTSTRAP_WORKSPACE_ID:1}
+
+  # Origins allowed to call this API from a browser. The Vite dev server runs on 5173.
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
 
