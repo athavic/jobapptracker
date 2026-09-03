@@ -67,3 +67,16 @@ def test_apply_without_a_ghost_threshold_is_a_usage_error(caplog):
 
 def test_an_incoherent_threshold_pair_is_a_usage_error():
     assert main([*ARGS, "--stale-after-days", "30", "--ghost-after-days", "7"]) == 2
+
+
+def test_a_missing_service_key_exits_two_without_a_traceback(monkeypatch, caplog):
+    """Configuration, not a refusal.
+
+    Exit 2 rather than 1 so a scheduler can tell "you have not set this up" from
+    "the API said no" - the first needs a human, the second may fix itself on
+    the next run.
+    """
+    monkeypatch.delenv("JOBTRACKER_SERVICE_KEY", raising=False)
+
+    assert main(ARGS) == 2
+    assert "JOBTRACKER_SERVICE_KEY" in caplog.text

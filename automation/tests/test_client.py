@@ -5,7 +5,7 @@ import pytest
 import respx
 from conftest import application_json, page_json
 
-from jobtracker_automation.client import ApiError, JobTrackerClient
+from jobtracker_automation.client import ApiError, JobTrackerClient, MissingServiceKey
 from jobtracker_automation.models import ApplicationStatus
 
 BASE = "http://api.test"
@@ -95,11 +95,15 @@ def test_an_unparseable_error_body_still_raises(settings):
 
 
 @respx.mock
-def test_every_request_identifies_the_worker_as_a_bot(settings):
-    """The header is the whole reason the events table can tell us apart.
+def test_every_request_authenticates_and_names_the_job(settings):
+    """The key is how the worker gets in; the job name is what it adds.
 
-    Asserted on a read as well as a write: it is set once on the session, so a
-    future endpoint added to this client cannot forget it.
+    Asserted on a read as well as a write: both are set once on the session, so
+    a future endpoint added to this client cannot forget them.
+
+    X-Actor is deliberately absent. The API stopped believing that header in
+    5c - AUTOMATION is now inferred from having authenticated with the service
+    key, which a browser cannot do.
     """
     respx.get(f"{BASE}/api/v1/applications").mock(
         return_value=httpx.Response(200, json=page_json([application_json(1)], page=0, size=2, total=1))
@@ -113,15 +117,16 @@ def test_every_request_identifies_the_worker_as_a_bot(settings):
         client.change_status(1, ApplicationStatus.GHOSTED, note="no reply")
 
     for call in respx.calls:
-        assert call.request.headers["X-Actor"] == "AUTOMATION"
+        assert call.request.headers["X-Service-Key"] == "test-service-key"
         assert call.request.headers["X-Actor-Detail"] == "nudge_stale"
+        assert "X-Actor" not in call.request.headers
 
     assert route.call_count == 1
 
 
 @respx.mock
-def test_a_client_with_no_job_name_still_admits_to_being_a_bot(settings):
-    """Forgetting the name costs detail, never the distinction that matters."""
+def test_a_client_with_no_job_name_still_authenticates(settings):
+    """Forgetting the name costs detail, never the ability to make the call."""
     respx.get(f"{BASE}/api/v1/applications/1").mock(
         return_value=httpx.Response(200, json=application_json(1))
     )
@@ -130,5 +135,19 @@ def test_a_client_with_no_job_name_still_admits_to_being_a_bot(settings):
         client.get_application(1)
 
     request = respx.calls[0].request
-    assert request.headers["X-Actor"] == "AUTOMATION"
+    assert request.headers["X-Service-Key"] == "test-service-key"
     assert "X-Actor-Detail" not in request.headers
+
+
+def test_a_missing_service_key_fails_immediately_and_says_why(settings, monkeypatch):
+    """Raised at construction, not on the first request.
+
+    A job that starts, records a run, and then 401s on every call leaves a
+    RUNNING row and a log full of authentication errors that do not name the
+    cause. One sentence before anything happens is cheaper to act on.
+    """
+    monkeypatch.delenv("JOBTRACKER_SERVICE_KEY", raising=False)
+    unconfigured = settings.model_copy(update={"service_key": None})
+
+    with pytest.raises(MissingServiceKey, match="JOBTRACKER_SERVICE_KEY"):
+        JobTrackerClient(unconfigured)

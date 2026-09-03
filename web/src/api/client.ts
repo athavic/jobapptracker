@@ -9,8 +9,53 @@ import type { components, paths } from './schema'
  * are checked against the real Java controller at compile time - rename a field
  * in a DTO, run `npm run generate:api`, and tsc names every file that breaks.
  */
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
+
 export const api = createClient<paths>({
-  baseUrl: import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080',
+  baseUrl: API_BASE_URL,
+  // Send the session cookie. Without this the browser withholds it on every
+  // cross-origin request - the dev server and the API are different origins -
+  // and every call is anonymous no matter who signed in.
+  credentials: 'include',
+})
+
+/**
+ * Where the sign-in handshake starts.
+ *
+ * A plain link, never a fetch. The browser has to *navigate* to Google and back
+ * for the cookie to be set on the API origin; a fetch would be blocked by CORS
+ * at accounts.google.com and could not carry the redirect anyway.
+ */
+export const SIGN_IN_URL = `${API_BASE_URL}/oauth2/authorization/google`
+
+const CSRF_COOKIE = 'XSRF-TOKEN'
+const CSRF_HEADER = 'X-XSRF-TOKEN'
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'TRACE'])
+
+function readCookie(name: string): string | undefined {
+  return document.cookie
+    .split('; ')
+    .find((entry) => entry.startsWith(`${name}=`))
+    ?.slice(name.length + 1)
+}
+
+/**
+ * Echoes the CSRF token back on every write.
+ *
+ * Spring writes the token into a cookie this script can read, and expects it
+ * returned in a header. That asymmetry is the whole mechanism: a hostile page
+ * can make the browser *send* our cookies, but it cannot read them, so it
+ * cannot produce the header. Reads are exempt because they change nothing and
+ * Spring does not ask.
+ */
+api.use({
+  onRequest({ request }) {
+    if (!SAFE_METHODS.has(request.method.toUpperCase())) {
+      const token = readCookie(CSRF_COOKIE)
+      if (token) request.headers.set(CSRF_HEADER, token)
+    }
+    return request
+  },
 })
 
 export type Application = components['schemas']['ApplicationResponse']

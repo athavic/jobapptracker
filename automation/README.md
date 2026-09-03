@@ -166,13 +166,20 @@ Three details in `client.py` worth knowing before writing a second job:
 - **Paging is pinned to `sort=id,asc`.** The API's default sort is `createdAt`,
   and any job that writes moves `updatedAt`; paging over a mutable ordering can
   show a row twice or skip one entirely as rows shift between pages.
-- **Every request carries `X-Actor: AUTOMATION`, plus the job name.** It is set
-  once on the httpx session, not per call, so a new endpoint on the client cannot
-  forget it. Without the header the API records the job's writes as a person's,
-  and an application this worker ghosted becomes indistinguishable from one you
-  ghosted yourself — which is the question `application_event` exists to answer.
-  Pass `job_name=` when constructing the client; a job that forgets loses the
-  name but is still recorded as a bot.
+- **Every request carries `X-Service-Key`, plus the job name.** Both are set once
+  on the httpx session, not per call, so a new endpoint on the client cannot
+  forget them. The key is how this worker gets in at all: from phase 5c the API
+  requires a principal on every request, and this one has no browser and so no
+  session cookie. Set `JOBTRACKER_SERVICE_KEY` to the same value the server reads
+  from `AUTOMATION_SERVICE_KEY`. A missing key raises `MissingServiceKey` at
+  construction and exits 2 — before a run is recorded, rather than as a wall of
+  401s inside one.
+- **`X-Actor` is gone, and its absence is the point.** The worker used to declare
+  itself a bot with that header and the API believed it, which meant a browser
+  could declare the same thing. `AUTOMATION` is now inferred from having
+  authenticated with the service key. Only the job name still has to be told,
+  because only the worker knows it: pass `job_name=` when constructing the
+  client; a job that forgets loses the name, not the identity.
 
 ## Next
 

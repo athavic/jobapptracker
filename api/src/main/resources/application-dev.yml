@@ -13,6 +13,12 @@ spring:
     properties:
       hibernate.format_sql: true
 
+app:
+  docs:
+    # Lets `npm run generate:api` read /v3/api-docs without a credential. Local
+    # only, for the same reason as everything else in this file.
+    public: true
+
 logging:
   level:
     # Uncomment to see the values bound into each query. Note what that means

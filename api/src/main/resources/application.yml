@@ -2,10 +2,50 @@ spring:
   application:
     name: jobtracker-api
 
+  config:
+    # Loads the gitignored .env as a property source, so ${GOOGLE_CLIENT_SECRET}
+    # below resolves against it.
+    #
+    # Spring Boot has no special support for .env files - but a .env IS a
+    # properties file, KEY=VALUE one per line, so [.properties] tells Boot to
+    # parse it as one. That is why this needs no extra dependency.
+    #
+    # Two paths because the working directory depends on how the app was
+    # started: api/ for `mvn -f api/pom.xml spring-boot:run` and for most IDE
+    # run configurations, the repository root for anything launched from there.
+    # `optional:` means a missing file is not an error, which is what keeps a
+    # fresh clone and CI - neither of which has a .env - starting normally.
+    #
+    # Consequence worth knowing: values are read as Java properties, so a
+    # backslash escapes and an unquoted # starts a comment. Google secrets
+    # contain neither.
+    import:
+      - optional:file:./.env[.properties]
+      - optional:file:../.env[.properties]
+
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:jobtracker}
     username: ${DB_USER:jobtracker}
     password: ${DB_PASSWORD:jobtracker}
+
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            # No default on purpose. An app that starts without these looks
+            # healthy right up until the first sign-in attempt fails somewhere
+            # deep in a redirect; refusing to start names the missing variable.
+            # See docs/google-oauth-setup.md.
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            # The three non-sensitive scopes, and nothing more. Anything
+            # sensitive or restricted - Gmail, in phase 7 - drags the whole app
+            # into Google verification.
+            scope: openid, email, profile
+        # No provider block: Google is one of the handful Spring Boot knows
+        # about already, including its issuer, endpoints and the fact that the
+        # user-name attribute is `sub`.
 
   mvc:
     problemdetails:
@@ -38,20 +78,64 @@ spring:
 
 server:
   port: ${SERVER_PORT:8080}
+  servlet:
+    session:
+      cookie:
+        # The session id is a bearer credential for the whole account, so
+        # JavaScript has no business reading it - HttpOnly is what stops one
+        # XSS bug from becoming a stolen session.
+        http-only: true
+        # Lax, not None: the cookie rides along with ordinary navigation but not
+        # with cross-site POSTs, which removes most of CSRF before the token even
+        # gets involved. localhost:5173 and localhost:8080 are the same site
+        # despite the different ports, so the UI is unaffected.
+        same-site: lax
+        # Off in development because there is no TLS on localhost, and a Secure
+        # cookie over http is simply never sent. Phase 8 sets this true.
+        secure: ${SESSION_COOKIE_SECURE:false}
 
 app:
+  docs:
+    # OpenAPI and Swagger UI without signing in.
+    #
+    # Default false. The document does not contain data, but it is a precise map
+    # of every endpoint and field, and there is no reason to hand that to an
+    # unauthenticated caller in production. application-dev.yml turns it on,
+    # which is what keeps `npm run generate:api` a one-command operation locally.
+    public: ${DOCS_PUBLIC:false}
+
   tenancy:
-    # PLACEHOLDER, removed in phase 5c.
+    # The workspace V7 created for the backfill, and the one the first person to
+    # sign in adopts.
     #
-    # V7 makes workspace_id NOT NULL on every table that holds your data, and
-    # until Google sign-in exists there is no principal to ask which workspace a
-    # request belongs to. So the API names one. This is the workspace V7 inserts
-    # for the backfill, with its id written explicitly in the migration so this
-    # value is a documented constant rather than a bet on where a sequence starts.
+    # No longer a placeholder: 5b used this to name a tenant because there was
+    # no principal to ask, and 5c deleted that class. What remains is a genuine
+    # piece of bootstrap. The rows that existed before there were users live in
+    # this workspace, so if nobody claimed it your own applications would sit in
+    # a workspace you are not a member of. Everyone after the first gets a fresh
+    # workspace of their own.
     #
-    # See FixedWorkspaceContext, which is the class this configures and the class
-    # that should not survive 5c.
+    # See SignInService.claimAWorkspace.
     bootstrap-workspace-id: ${BOOTSTRAP_WORKSPACE_ID:1}
+
+  auth:
+    # Where the browser lands after Google sends it back.
+    #
+    # The UI, not the API. In development these are different origins, so the
+    # framework default - resume whatever was being fetched when the session
+    # expired - would leave the browser looking at raw JSON.
+    success-redirect: ${AUTH_SUCCESS_REDIRECT:http://localhost:5173}
+
+  automation:
+    # Shared secret for the Python worker, which has no browser and so no
+    # session. Blank means service authentication is off and the worker gets
+    # 401s: an unset property must never read as "authentication optional".
+    #
+    # Generate a long random value and put it in .env. It is a credential that
+    # acts across every workspace, which makes it the one secret in this project
+    # that must never reach a browser. Phase 5f replaces it with per-job
+    # identities and rotation.
+    service-key: ${AUTOMATION_SERVICE_KEY:}
 
   # Origins allowed to call this API from a browser. The Vite dev server runs on 5173.
   cors:

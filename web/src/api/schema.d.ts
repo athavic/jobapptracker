@@ -100,6 +100,23 @@ export interface paths {
         patch: operations["update"];
         trace?: never;
     };
+    "/api/v1/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The signed-in user and their current workspace */
+        get: operations["me"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/automation/runs/{id}": {
         parameters: {
             query?: never;
@@ -277,6 +294,15 @@ export interface components {
             /** Format: date-time */
             appliedAt?: string;
             archived?: boolean;
+        };
+        MeResponse: {
+            /** Format: int64 */
+            userId?: number;
+            /** Format: int64 */
+            workspaceId?: number;
+            email?: string;
+            displayName?: string;
+            avatarUrl?: string;
         };
         PageResponseAutomationRunResponse: {
             content: components["schemas"]["AutomationRunResponse"][];
@@ -571,6 +597,26 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApplicationResponse"];
+                };
+            };
+        };
+    };
+    me: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["MeResponse"];
                 };
             };
         };

@@ -12,7 +12,7 @@ import sys
 
 import httpx
 
-from .client import ApiError, JobTrackerClient
+from .client import ApiError, JobTrackerClient, MissingServiceKey
 from .config import Settings, load_settings
 from .jobs import nudge_stale as run_nudge_stale
 from .jobs.nudge_stale import JOB_NAME as NUDGE_STALE
@@ -96,6 +96,13 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         return _dispatch(args, settings, trigger)
+    except MissingServiceKey as unconfigured:
+        # A missing credential is configuration, like the ValueError above, and
+        # deserves the same treatment: one sentence naming the variable, and no
+        # traceback. Exit 2 rather than 1 because nothing was attempted - the
+        # scheduler should not read this as "the API refused us".
+        log.error("%s", unconfigured)
+        return 2
     except ApiError as error:
         log.error("%s", error)
         return 1
