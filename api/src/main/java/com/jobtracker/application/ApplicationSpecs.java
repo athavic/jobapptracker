@@ -19,14 +19,6 @@ final class ApplicationSpecs {
     }
 
     /**
-     * Matches any of the given statuses, or every status when none are given.
-     *
-     * <p>An empty collection means "no filter", not "match nothing". Both readings
-     * are defensible in the abstract; this one is right here because the empty
-     * case is what the UI sends when you untick the last checkbox, and a filter
-     * that hides everything the moment you clear it reads as a broken page.</p>
-     */
-    /**
      * The base filter: every query in this service is anded with it.
      *
      * <p>An empty scope adds no predicate at all, which means the caller reads
@@ -53,6 +45,14 @@ final class ApplicationSpecs {
         return (root, query, cb) -> cb.equal(root.get("id"), id);
     }
 
+    /**
+     * Matches any of the given statuses, or every status when none are given.
+     *
+     * <p>An empty collection means "no filter", not "match nothing". Both readings
+     * are defensible in the abstract; this one is right here because the empty
+     * case is what the UI sends when you untick the last checkbox, and a filter
+     * that hides everything the moment you clear it reads as a broken page.</p>
+     */
     static Specification<JobApplication> hasStatusIn(Collection<ApplicationStatus> statuses) {
         return (root, query, cb) -> statuses == null || statuses.isEmpty()
                 ? cb.conjunction()
