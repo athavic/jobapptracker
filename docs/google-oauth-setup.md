@@ -1,6 +1,6 @@
 # Google OAuth setup (needed before phase 5c)
 
-Phase 5c replaces `X-Actor` with a real Google sign-in. That needs an OAuth
+Phase 5c replaced `X-Actor` with a real Google sign-in. That needs an OAuth
 client, which only you can create — it lives in your Google account, and the
 client secret is a credential that should never pass through a chat window or a
 commit.
@@ -110,34 +110,71 @@ on every sign-in — but the secret is a password for your OAuth client. If it d
 get exposed, the fix is one button: **Credentials → the client → Reset secret**,
 which invalidates the old value immediately.
 
-### The file is not enough on its own
+### How the API reads it
 
-**Spring Boot does not read `.env` files.** Nothing in the framework looks for
-one. `${GOOGLE_CLIENT_ID}` in `application.yml` resolves against real environment
-variables and the usual Spring property sources, and finds nothing if the value
-exists only in a file.
+**Spring Boot has no special support for `.env` files** — and needs none, because
+a `.env` *is* a properties file: `KEY=VALUE`, one per line. Phase 5c added this
+to `application.yml`:
 
-Today that file is read by exactly one thing: **docker compose**, which picks up
-a root `.env` automatically. That is why the `DB_*` variables look like they
-work — Compose reads them, and the API separately falls back to identical
-defaults in `application.yml`. The API is not reading the file.
+```yaml
+spring:
+  config:
+    import:
+      - optional:file:./.env[.properties]
+      - optional:file:../.env[.properties]
+```
 
-Phase 5c closes the gap with the `spring-dotenv` dependency, which loads `.env`
-into Spring's `Environment` at startup, so the `${...}` placeholders already used
-throughout `application.yml` keep working unchanged. The alternative — pasting
-the values into IntelliJ's run configuration — also works, but lives in IDE
-settings rather than in the project, so it does not survive a fresh clone and
-nobody else can see what it sets.
+`[.properties]` tells Boot how to parse a file whose name gives no hint. Two
+paths because the working directory depends on how the app was started — `api/`
+for `mvn -f api/pom.xml spring-boot:run` and most IDE run configurations, the
+repository root for anything launched from there. `optional:` means a missing
+file is not an error, which is what lets a fresh clone and CI start normally.
 
-Nothing to do about this now. The file and its contents are right; they just
-need one dependency before anything reads them.
+Before 5c, only **docker compose** read this file, which is why the `DB_*`
+variables appeared to work: Compose read them, and the API separately fell back
+to identical defaults. Both read it now.
 
-## 6. Tell me it exists
+One consequence worth knowing: values are parsed as Java properties, so a
+backslash escapes and an unquoted `#` starts a comment. Google credentials
+contain neither.
 
-That is all 5c needs from you. Say the client is created and I will wire it up:
-the `spring-boot-starter-oauth2-client` dependency, the security filter chain,
-the session cookie, first-sign-in adoption of the bootstrap workspace, and
-`GET /api/v1/me`.
+## 6. Generate the worker's service key
+
+One more secret, unrelated to Google. From 5c the API requires a principal on
+every request, and the Python worker has no browser and therefore no session
+cookie. It presents a shared key instead.
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+The same value goes in two places — two names because each side namespaces its
+own configuration, one secret because it is one credential:
+
+- `AUTOMATION_SERVICE_KEY` in the root `.env`, which the API reads
+- `JOBTRACKER_SERVICE_KEY` in `automation/.env`, which the worker reads
+
+Leave it blank and service authentication is simply off: the worker gets 401s,
+and the API logs a warning at startup saying so. It acts across every workspace,
+which makes it the one secret in this project that must never reach a browser.
+
+## 7. Sign in
+
+```bash
+docker compose up -d
+mvn -B -f api/pom.xml spring-boot:run
+```
+
+then `npm run dev` in `web/`, open <http://localhost:5173>, and press
+**Continue with Google**.
+
+The first person to sign in adopts the workspace the V7 migration created — the
+one holding every application that existed before there were users. Everyone
+after that gets a workspace of their own.
+
+If it fails, the two usual causes are both in this document: an account that is
+not on the **Test users** list, and a redirect URI that does not match character
+for character.
 
 ---
 

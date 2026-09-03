@@ -268,12 +268,13 @@ web/src/
   rows are saved inside `changeStatus`, not after it, so there is no window where the
   status moved but the history did not. A history with gaps is worse than none, because
   it looks complete.
-- **Who did it comes from an `X-Actor` header, behind `ActorContext`.** The service
-  records an actor without knowing HTTP exists, which is what lets phase 5 swap in an
-  authenticated principal without touching a service method. An unrecognised value is a
-  400 rather than a quiet fall back to `HUMAN` - misattributing a bot's write to a
-  person would corrupt the one column nobody would think to double-check. It trusts the
-  caller completely, which is only acceptable while there is nothing to protect.
+- **Who did it comes from the authenticated principal, behind `ActorContext`.** The
+  service records an actor without knowing HTTP exists, which is what let phase 5c swap
+  the implementation without touching a service method. Until then the answer came from
+  an `X-Actor` header the API simply believed; now a session cookie means `HUMAN` and
+  the service key means `AUTOMATION`, and the caller cannot choose. That mattered
+  because misattributing a bot's write to a person corrupts the one column whose entire
+  job is to be trustworthy.
 - **The timeline is read-only.** An editable history answers "what do we currently claim
   happened", which is the question `job_application` already answers.
 
@@ -323,9 +324,16 @@ retrofit, and because phase 4's events table is what makes a shared workspace
 legible: once two people can move the same application, "who moved this" stops
 being a curiosity and becomes the only way to read the board.
 
-That phase is also where `X-Actor` has to go. A self-declared identity is a
-convenience today and a privilege-escalation bug the moment there is a real
-principal to impersonate; `ActorContext` exists so that replacement is one class.
+5a-5c are merged: the tenancy tables, `workspace_id` on everything that holds data,
+and Google sign-in with a session cookie. `X-Actor` is gone, replaced in one class
+exactly as `ActorContext` was designed for. Next is 5d, where every query learns to
+say which workspace it means - authentication and scoping are separate problems, so
+until then a signed-in user still sees everything.
+
+Two credentials now matter locally: the Google client from
+[docs/google-oauth-setup.md](docs/google-oauth-setup.md), and a service key for the
+Python worker, which has no browser and so no session. Both live in a gitignored
+`.env`; `.env.example` says what to put there.
 
 Then the scraper at 6, Gmail ingestion at 7 and deployment at 8. Sections 12 and 13
 of the [blueprint](https://claude.ai/code/artifact/e244d427-b199-4c28-83c6-b5f85d882342)
