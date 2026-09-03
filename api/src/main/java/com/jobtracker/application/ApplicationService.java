@@ -105,6 +105,7 @@ public class ApplicationService {
                                                     boolean includeArchived,
                                                     Pageable pageable) {
         Specification<JobApplication> spec = ApplicationSpecs.fetchCompany()
+                .and(ApplicationSpecs.inWorkspace(workspaceContext.readScope()))
                 .and(ApplicationSpecs.hasStatusIn(statuses))
                 .and(ApplicationSpecs.companyNameContains(companyName))
                 .and(ApplicationSpecs.archivedFilter(includeArchived));
@@ -224,11 +225,10 @@ public class ApplicationService {
      */
     @Transactional(readOnly = true)
     public List<ApplicationEventResponse> events(Long id) {
-        if (!applications.existsById(id)) {
-            // Checked explicitly so an unknown id is a 404 rather than a
-            // cheerful empty list, which would read as "nothing ever happened".
-            throw new NotFoundException("Application", id);
-        }
+        // Checked explicitly so an unknown id is a 404 rather than a cheerful
+        // empty list, which would read as "nothing ever happened" - and scoped,
+        // because a timeline is as much of a leak as the application itself.
+        requireInScope(id);
         return events.findByApplicationIdOrderByOccurredAtDescIdDesc(id).stream()
                 .map(ApplicationEventMapper::toResponse)
                 .toList();
@@ -260,9 +260,7 @@ public class ApplicationService {
 
     @Transactional
     public void delete(Long id) {
-        if (!applications.existsById(id)) {
-            throw new NotFoundException("Application", id);
-        }
+        requireInScope(id);
         applications.deleteById(id);
     }
 
@@ -278,9 +276,36 @@ public class ApplicationService {
         return actorContext.detail();
     }
 
+    /**
+     * One application, or a 404 - including when it exists in another workspace.
+     *
+     * <p>Deliberately NOT "fetch by id, then check the workspace in Java". The
+     * scope is part of the query, so a row belonging to someone else never
+     * arrives in the first place, and a new call site cannot forget the check
+     * because there is no unscoped lookup to call.
+     *
+     * <p>NotFoundException, never an access-denied exception. A 403 would
+     * confirm the row is real, and a caller who can tell "no such id" from "not
+     * yours" can map every application in the system without reading one.
+     */
     private JobApplication load(Long id) {
-        return applications.findWithCompanyById(id)
+        return applications.findOne(scoped().and(ApplicationSpecs.fetchCompany()).and(ApplicationSpecs.hasId(id)))
                 .orElseThrow(() -> new NotFoundException("Application", id));
+    }
+
+    /**
+     * The same 404, for the two operations that never needed the row itself.
+     * Cheaper than load() - no join, no entity - and identical from outside.
+     */
+    private void requireInScope(Long id) {
+        if (!applications.exists(scoped().and(ApplicationSpecs.hasId(id)))) {
+            throw new NotFoundException("Application", id);
+        }
+    }
+
+    /** The base filter every query in this class is built on. */
+    private Specification<JobApplication> scoped() {
+        return ApplicationSpecs.inWorkspace(workspaceContext.readScope());
     }
 
     /**

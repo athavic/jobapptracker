@@ -6,6 +6,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
+import java.util.Optional;
+
 /**
  * The workspace comes from whoever is signed in.
  *
@@ -21,6 +23,21 @@ import org.springframework.stereotype.Component;
  */
 @Component
 class AuthenticatedWorkspaceContext implements WorkspaceContext {
+
+    @Override
+    public Optional<Long> readScope() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication != null && authentication.getPrincipal() instanceof WorkspaceUser user) {
+            return Optional.of(user.getWorkspaceId());
+        }
+
+        // Empty, not an exception: the service key belongs to the worker, which
+        // acts across every workspace by design. This is the one place an
+        // unfiltered read is correct, and it is reachable only by a caller that
+        // presented a credential no browser holds.
+        return Optional.empty();
+    }
 
     @Override
     public Long currentId() {

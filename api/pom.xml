@@ -86,11 +86,38 @@
       <scope>test</scope>
     </dependency>
 
-    <!-- The request post-processors and @WithMockUser support the controller
-         slices need now that every endpoint requires a principal. -->
+    <!-- The request post-processors the controller slices need now that every
+         endpoint requires a principal. -->
     <dependency>
       <groupId>org.springframework.security</groupId>
       <artifactId>spring-security-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <!--
+      A real PostgreSQL for the scoping tests, started and thrown away per run.
+
+      Phase 5d asserts that one workspace cannot read another, and that claim is
+      about SQL: it lives in a Specification, a WHERE clause and a fetch join,
+      none of which a mocked repository exercises. An in-memory database would
+      not do either - it would be a different dialect answering a different
+      query from the one production runs.
+
+      Needs Docker, which this project already requires for its database.
+    -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-testcontainers</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>junit-jupiter</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>
